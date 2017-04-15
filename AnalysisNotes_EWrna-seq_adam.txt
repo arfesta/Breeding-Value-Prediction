@@ -494,7 +494,7 @@ for lane in {01..08}; do for file in lane${lane}/*.fastq.gz ; do result=` zcat $
 arfesta@fairfax:/media/seagate/LGEP/batch.2$ for lane in {09..12}; do for file in lane${lane}/*.fastq.gz ; do result=` zcat $file | awk 'NR%4==1' | head -10000 | tail -1`; echo $file "${result}" >>index.summary.txt; done; done
 
 ##############################################################
-##################Calling SNPS for EW test
+##Calling SNPS for EW test
 arfesta@fairfax:/media/sg3/ptaeda/bowtie$ for file in /media/seagate2/LGEP/E.W.lane.tarfiles/filt.trim.rep1/*.fq.gz; do /home/ross/software/bowtie2-2.2.1/bowtie2 -p 22 -x v101.scaff -U "$file" -S "${file%}rep2.sam" ; done
 
 #The code above executes the following command:
@@ -512,5 +512,5 @@ do the bowtie2 command(pointing to the directory of the program)
 
 for file in *.sam; do samtools view -b -S -o /media/seagate/LGEP/Sequencing/filt.trim_rep3/$file.bam $file  ; done
 
-#Converted SAM files to BAM files one by one and they are output in the rep2samfiles  ##direcotry
+#Converted SAM files to BAM files one by one and they are output in the rep2samfiles direcotry
 #The same loop above was ran for rep1samfiles and rep3 samfiles.
