@@ -372,7 +372,7 @@ for file in *.sam; do samtools view -b -S -o /media/seagate/LGEP/Sequencing/filt
 #Converted SAM files to BAM files one by one and they are output in the rep2samfiles  ##direcotry
 #The same loop above was ran for rep1samfiles and rep3 samfiles.
 
-########The below was done for only 48 files (suppose to be 47 but 55q was replaced with ########57e at a later point so 57e was done by itself in bamaddrg, samtools sort, and ########then was manually put in the freebayes.list file replacing 55q and then merged
+###The below was done for only 48 files (suppose to be 47 but 55q was replaced with 57e at a later point so 57e was done by itself in bamaddrg, samtools sort, and then was manually put in the freebayes.list file replacing 55q and then merged
 
 #Now take 1 biological rep for every family and run bamaddrg which will add read groups #and merge technical reps for 1 sample from each family
 ##First created samples.list, in ptaeda/bowtie directory, which contains list of 1 sample name from each family (1o,4s,7d, ect..).
@@ -447,7 +447,7 @@ vcftools --vcf freeqfilt.recode.vcf --singletons
  #out.singletons
 
 #######################################
-##Also use samtools mpileup to see the difference - first create bcf uncompressed and ###then pipe that to use bcftools to call vcf format, multi-allelic, vcf file type, and ###then file name.
+##Also use samtools mpileup to see the difference - first create bcf uncompressed and then pipe that to use bcftools to call vcf format, multi-allelic, vcf file type, and then file name.
 
 arfesta@fairfax:/media/sg3/ptaeda/bowtie$ for file in *.sort.bam; do samtools mpileup -ugf v101.scaffolds.fa  $file | bcftools call -vmO z -o ${file%.*}.vcf.gz ; done
 
@@ -495,7 +495,7 @@ cat Sample_25e/*.fastq.gz > Sample_25e.fastq.gz
 #THIS WORKS to do this on a given direcotry (i.e. lane05_2_2 = Y5_2.tar)
 arfesta@fairfax:/media/seagate/LGEP/lane.tarfiles/lane04_3_2$ for f in Sample_*; do (cd $f && cat *.fastq.gz > ../${f}.fastq.gz); done
 
-#Then change the directory to the next lane (i.e. lane06_2_2) and run again for all 6 new ##lanes
+#Then change the directory to the next lane (i.e. lane06_2_2) and run again for all 6 new anes
 
 #Now run fastqc on all new data that has not been filtered or trimmed
 NEED TO DO
@@ -513,7 +513,7 @@ ls *2.fq.gz | sed 's/.fq.gz//' >> rep2lanestorunsailfish.list
 cd filttrim_rep3
 ls *2.fq.gz | sed 's/.fq.gz//' >> rep3lanestorunsailfish.list
 
-#move these new lists to the LGEP directory and then run the code below to execute #sailfish
+#move these new lists to the LGEP directory and then run the code below to execute sailfish
 
 export LD_LIBRARY_PATH=/home/ross/software/sailfish.old/lib
 while read id; do sailfish quant -i /media/sg3/ptaeda/Pita.86ktxptome.sfidx -l "T=SE:S=S" -r <(zcat filttrim_rep2/${id}.fq.gz) -o countfiles/${id}_rep2 -p 6 -a; done < rep2lanestorunsailfish.list
@@ -543,7 +543,7 @@ ls lane04_3/*.gz |  sed 's%lane04_3/Sample_%%' | sed 's/.fastq.gz//' >> rep3coun
 
 arfesta@fairfax:/media/seagate/LGEP/countfiles$ while read id; do mv ${id}_rep3 ../oldcountfiles ; done < rep3countfilestoremove.list
 
-###NOW WE CAN READ IN THE NEW DATA SET WITH UPDATED 6 LANES INTO R using #readincountfiles.R in the LGEP/analysis folder
+###NOW WE CAN READ IN THE NEW DATA SET WITH UPDATED 6 LANES INTO R using readincountfiles.R in the LGEP/analysis folder
 ###################################################################################
 ###################################################################################
 ###################################################################################
@@ -596,7 +596,7 @@ while read id; do /home/ross/software/bbmap/bbduk.sh -Xmx2g in=lane05_3/Sample_$
 
 while read id; do /home/ross/software/bbmap/bbduk.sh -Xmx2g in=lane06_3/Sample_${id}.fastq.gz out=../filt.trim_rep3/${id}.fq.gz ref=/home/ross/software/bbmap/resources/truseq.fa.gz forcetrimleft=10 t=1 ktrim=r k=25 mink=12 hdist=1 qtrim=rl trimq=20 minlength=50; done < <(ls lane06_3/*.gz |  sed 's%lane06_3/Sample_%%' | sed 's/.fastq.gz//' )
 
-#The above code is for rep 1, we can change to rep2 or 3 by adding _2 or _3 to the "lane0*".  Also change output to the filt.trim rep it #belongs to, so for rep2 it would be filt.trim_rep2 as the output location
+#The above code is for rep 1, we can change to rep2 or 3 by adding _2 or _3 to the "lane0*".  Also change output to the filt.trim rep it belongs to, so for rep2 it would be filt.trim_rep2 as the output location
 ###################################
 ###########################################
 #####################################
