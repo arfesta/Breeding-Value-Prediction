@@ -11,7 +11,7 @@
      
      *First set included 6 tar files labeled: Project_20150504-GSL028B-Whetten-X1POOL && X2,X3,X4,X5,X6
       
-      *Second set included 12 tar files labeled: Project_20150615-GSL033A-Whetten-Y1POOL && 2,3,4,5,6 && Z1,Z2,Z3,Z4,Z5,Z6
+     *Second set included 12 tar files labeled: Project_20150615-GSL033A-Whetten-Y1POOL && 2,3,4,5,6 && Z1,Z2,Z3,Z4,Z5,Z6
     
     *The names of directores where manually edited to be lane01:lane06 corresponding to X1:X6
       
