@@ -160,12 +160,19 @@ All lanes are processed the same way by changing the lane numbers in the bbduk c
 
 #### 5. Aligning reads to 86K transcriptome with Salmon
   #First index the 86k transcriptome:
+
+```linux
 ./software/Salmon/bin/salmon index -t ./references/Pita.86ktxptome.fasta -i ./references/Pita.86k -p 5 --perfectHash --type "quasi" -k 25
+```
 
 #Salmon fld flags that it says are important for single end reads.  Need to loook into this further.
 
-while read file; do bioawk -c fastx '{ print length($seq) }' < ./$file  > $file.txt ; R -q -e "x <- read.csv('mean.txt',header=F);the.sum=summary(x);sd=sd(x[,1]);save.image($file.RData,compress=T)"  ; done < lane01.list
-./solfware/Salmon/bin/salmon quant --fldMean 113 --fldSD 7.8 --seqBias -r ./trimmedfiltreads/EW/lane01/15 -o output.counts -l U --numBootstraps 2
+``` linux
+cd /media/disk6/ARF/RNASEQ
+
+while read file; do ./software/Salmon/bin/salmon quant --seqBias -r ./trimmedfiltreads/EW/lane01/$file -i ./references/Pita.86k -o ./counts/86kSalmon/EW/lane01/$file -l U --numBootstraps 2; done < ./rawreads/EWfasta/lane01/lane01.list
+
+``` 
   #Then align counts and place in counts folder
   
   
