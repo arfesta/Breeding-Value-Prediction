@@ -175,13 +175,13 @@ while read file; do ./software/Salmon/bin/salmon quant --seqBias -r ./trimmedfil
 ``` 
   #Then align counts and place in counts folder
   
-  
-#### 6. Aligning reads to 83K transcriptome with Salmon  
-  
-  ./software/Salmon/bin/salmon index -t ./references/Pita.83k.fa -i ./references/Pita.83k -p 5 --perfectHash --type "quasi" -k 25
-  
  
-#### 7. Align reads with bowtie to 86k
+#### 6. Align reads with bowtie to 86k 
+#### 7. Aligning reads to 83K transcriptome with Salmon  
+```linux
+  ./software/Salmon/bin/salmon index -t ./references/Pita.83k.fa -i ./references/Pita.83k -p 5 --perfectHash --type "quasi" -k 25
+```  
+ 
 
 
   
