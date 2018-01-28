@@ -99,7 +99,7 @@
  ```
     
     
-***Noticed there is rRNA contamination in Sample 71 in EW lane 09.***
+**Noticed there is rRNA contamination in Sample 71 in EW lane 09.***
 
 
 #### 3. Remove rRNA contamination
