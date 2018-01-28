@@ -6,12 +6,20 @@
  ```
  
 *Within the LGEP directory there are 18 .tar files (144 biological samples) and then an additional directory which includes tar files from the first run of sequencing.
-
+   *The 18 tar files were delivered at two seperate times
+      *First set included 6 tar files labeled: Project_20150504-GSL028B-Whetten-X1POOL && X2,X3,X4,X5,X6
+      *Second set included 12 tar files labeled: Project_20150615-GSL033A-Whetten-Y1POOL && 2,3,4,5,6 && Z1,Z2,Z3,Z4,Z5,Z6
+    *The names of directores where manually edited to be lane01:lane06 corresponding to X1:X6
+      -lane07:lane12 corresponding to Y1:Y6
+      -lane13:lane18 corresponding to Z1:Z6
+     *Note samepl ein lane12 tar file 11x really belongs to lane11 so it was moved there.
+     
 *Within the EW directory there are 12 .tar files (96 biological samples)
   *The 12 tar files were delivered at two seperate times
      *First set included 4 tar files labeled: 20151203-GSL-046-B-Whetten-Pool9 && 10,11,12
      *Second set included 8 tar files labeled: GSL-047-A-Whetten-Pool1 && 2,3,4,5,6,7,8
   *The names of directories were manually edited to be lane01:lane12 corresponding to Pool  
+  
       
 ##### 1. Untar sequencing lanes
 
@@ -34,6 +42,22 @@
   
   ```linux 
    cd /media/disk6/ARF/RNASEQ/rawreads/EWfasta/lane10
+   ls *.fastq.gz > lane10.list
+   mkdir fastqc
+   while read file; do /media/disk6/ARF/RNASEQ/software/FastQC/fastqc $file -o ./fastqc; done < lane10.list
+   
+   
+   cd /media/disk6/ARF/RNASEQ/rawreads/EWfasta/lane12
+   ls *.fastq.gz > lane12.list
+   mkdir fastqc
+   while read file; do /media/disk6/ARF/RNASEQ/software/FastQC/fastqc $file -o ./fastqc; done < lane12.list
+    ...
+    ...
+   ```
+     
+        #Change into each of the 18 directories; create list of .fastq.gz files; make fastqc output dir and run fastqc
+    ```linux 
+   cd /media/disk6/ARF/RNASEQ/rawreads/LGEPfasta/lane10
    ls *.fastq.gz > lane10.list
    mkdir fastqc
    while read file; do /media/disk6/ARF/RNASEQ/software/FastQC/fastqc $file -o ./fastqc; done < lane10.list
