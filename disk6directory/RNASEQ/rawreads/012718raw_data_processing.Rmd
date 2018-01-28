@@ -52,6 +52,24 @@
 
 
 ###### 3. Remove rRNA contamination
+
+*Accessed www.arb-silva.de and searched for Pinus taeda
+
+*805 Accessions showed up in results and were downloaded.  The original .tgz is located at 
+
+```linux
+/media/disk6/ARF/RNASEQ/software/arb-silva.de_2018-1-28_id495187.tgz
+```
+
+*The .fasta file inside the .tgz was placed in:
+
+```linux
+/media/disk6/ARF/RNASEQ/software/bbmap/resources
+```
+
+*bbDuk can be used to do overall quality trim, as well as trim first 10 bases, remove adapters, and matches to rRNA.
+
+
 ```linux 
 
 ./indexdb_rna --ref ./rRNA_databases/silva-euk-18s-id95.fasta,./index/euk.18s.db -v
