@@ -13,7 +13,7 @@ Within the EW directory there are 12 .tar files (96 biological samples)
         --Second set included 8 tar files labeled: GSL-047-A-Whetten-Pool1 && 2,3,4,5,6,7,8
    -- The names of directories were manually edited to be lane01:lane12 corresponding to Pool  
       
-*1. Untar sequencing lanes
+###### 1. Untar sequencing lanes
 
 ```linux
     cd /media/disk6/ARF/RNASEQ/rawreads/EWtarfiles
@@ -29,9 +29,10 @@ Within the EW directory there are 12 .tar files (96 biological samples)
     while read file; do tar -xf ./$file --directory ../LGEPfasta/; done < LGEP.tar.list
 ```    
 
- *2. Run fastqc on raw files
+###### 2. Run fastqc on raw files
       #Change into each of the 12 directories; create list of .fastq.gz files; make fastqc output dir and run fastqc
-      
+  
+  ```linux 
    cd /media/disk6/ARF/RNASEQ/rawreads/EWfasta/lane10
    ls *.fastq.gz > lane10.list
    mkdir fastqc
@@ -44,14 +45,16 @@ Within the EW directory there are 12 .tar files (96 biological samples)
    while read file; do /media/disk6/ARF/RNASEQ/software/FastQC/fastqc $file -o ./fastqc; done < lane12.list
     ...
     ...
-    while read file; do /media/disk6/ARF/RNASEQ/software/FastQC/fastqc $file -o ./fastqc; done < lane11.list
-    
+   ```
     
     
 ***Noticed there is rRNA contamination in Sample 71 in EW lane 09.***
 
 
-*3. Remove rRNA contamination
+###### 3. Remove rRNA contamination
+```linux 
+
 ./indexdb_rna --ref ./rRNA_databases/silva-euk-18s-id95.fasta,./index/euk.18s.db -v
 
 ./sortmerna --ref ./rRNA_databases/silva-euk-18s-id95.fasta,./index/euk.18s.db  --reads /media/disk6/ARF/RNASEQ/rawreads/EWfasta/20151203-GSL-046-B-Whetten-Pool9/73_S24_L001_R1_001.fastq --aligned out.out --fastx
+```
