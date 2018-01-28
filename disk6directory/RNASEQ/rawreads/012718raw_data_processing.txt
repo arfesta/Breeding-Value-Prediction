@@ -6,19 +6,46 @@ Raw mRNA sequencing libraries returned from the GSL are located at:
 Within the LGEP directory there are 18 .tar files (144 biological samples) and then an additional directory which includes tar files from the first run of sequencing.
 
 Within the EW directory there are 12 .tar files (96 biological samples)
-
+   -- The 12 tar files were delivered at two seperate times
+        --First set included 4 tar files labeled: 20151203-GSL-046-B-Whetten-Pool9 && 10,11,12
+        --Second set included 8 tar files labeled: GSL-047-A-Whetten-Pool1 && 2,3,4,5,6,7,8
+   -- The names of directories were manually edited to be lane01:lane12 corresponding to Pool  
+      
 1. Untar sequencing lanes
     cd /media/disk6/ARF/RNASEQ/rawreads/EWtarfiles
     ls *.tar > EW.tar.list
     
     while read file; do tar -xf ./$file --directory ../EWfasta/; done < EW.tar.list
-    cd ../EWfasta
-    ls
-    
-    
     
     
     cd /media/disk6/ARF/RNASEQ/rawreads/LGEPtarfiles
     ls *.tar > LGEP.tar.list
     
     while read file; do tar -xf ./$file --directory ../LGEPfasta/; done < LGEP.tar.list
+    
+ 2. Run fastqc on raw files
+      #Change into each of the 12 directories; create list of .fastq.gz files; make fastqc output dir and run fastqc
+      
+   cd /media/disk6/ARF/RNASEQ/rawreads/EWfasta/lane10
+   ls *.fastq.gz > lane10.list
+   mkdir fastqc
+   while read file; do /media/disk6/ARF/RNASEQ/software/FastQC/fastqc $file -o ./fastqc; done < lane10.list
+   
+   
+   cd /media/disk6/ARF/RNASEQ/rawreads/EWfasta/lane12
+   ls *.fastq.gz > lane12.list
+   mkdir fastqc
+   while read file; do /media/disk6/ARF/RNASEQ/software/FastQC/fastqc $file -o ./fastqc; done < lane12.list
+    ...
+    ...
+    while read file; do /media/disk6/ARF/RNASEQ/software/FastQC/fastqc $file -o ./fastqc; done < lane11.list
+    
+    
+    
+***Noticed there is rRNA contamination in Sample 71 in EW lane 09.***
+
+
+3. Remove rRNA contamination
+./indexdb_rna --ref ./rRNA_databases/silva-euk-18s-id95.fasta,./index/euk.18s.db -v
+
+./sortmerna --ref ./rRNA_databases/silva-euk-18s-id95.fasta,./index/euk.18s.db  --reads /media/disk6/ARF/RNASEQ/rawreads/EWfasta/20151203-GSL-046-B-Whetten-Pool9/73_S24_L001_R1_001.fastq --aligned out.out --fastx
