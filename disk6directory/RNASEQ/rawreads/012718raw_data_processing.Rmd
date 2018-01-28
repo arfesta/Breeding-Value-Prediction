@@ -1,17 +1,17 @@
 ## 1/27/18
-Raw mRNA sequencing libraries returned from the GSL are located at:
+*Raw mRNA sequencing libraries returned from the GSL are located at:
 
 ```linux
   /media/disk6/ARF/RNASEQ/rawreads/EWtarfiles && LGEPtarfiles
  ```
  
-Within the LGEP directory there are 18 .tar files (144 biological samples) and then an additional directory which includes tar files from the first run of sequencing.
+*Within the LGEP directory there are 18 .tar files (144 biological samples) and then an additional directory which includes tar files from the first run of sequencing.
 
-Within the EW directory there are 12 .tar files (96 biological samples)
-   -- The 12 tar files were delivered at two seperate times
-        --First set included 4 tar files labeled: 20151203-GSL-046-B-Whetten-Pool9 && 10,11,12
-        --Second set included 8 tar files labeled: GSL-047-A-Whetten-Pool1 && 2,3,4,5,6,7,8
-   -- The names of directories were manually edited to be lane01:lane12 corresponding to Pool  
+*Within the EW directory there are 12 .tar files (96 biological samples)
+  *The 12 tar files were delivered at two seperate times
+     *First set included 4 tar files labeled: 20151203-GSL-046-B-Whetten-Pool9 && 10,11,12
+     *Second set included 8 tar files labeled: GSL-047-A-Whetten-Pool1 && 2,3,4,5,6,7,8
+  *The names of directories were manually edited to be lane01:lane12 corresponding to Pool  
       
 ###### 1. Untar sequencing lanes
 
