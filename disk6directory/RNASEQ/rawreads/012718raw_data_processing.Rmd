@@ -67,7 +67,7 @@
      
         #Change into each of the 18 directories; create list of .fastq.gz files; make fastqc output dir and run fastqc
         
-    ```linux 
+   ```linux 
    cd /media/disk6/ARF/RNASEQ/rawreads/LGEPfasta/lane10
    ls *.fastq.gz > lane10.list
    mkdir fastqc
