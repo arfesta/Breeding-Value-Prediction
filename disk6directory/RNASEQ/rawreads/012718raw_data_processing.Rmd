@@ -48,6 +48,21 @@
     while read file; do tar -xf ./$file --directory ../LGEPfasta/; done < LGEP.tar.list
 ```    
 
+    #lanes 11,12,13,14,15,16 have folders of 24 samples with 3 smaller .fasta.gz files within each folder corresponding to that sample.  These samples need to be merged for further processing to be identified as one single techincal rep.
+
+```linux
+cd /media/disk6/ARF/RNASEQ/rawreads/LGEPfasta/lane11
+ls -d S* > list.lane
+while read file; do cat ./$file/*.fastq.gz > $file.fastq.gz; done < list.lane
+
+cd /media/disk6/ARF/RNASEQ/rawreads/LGEPfasta/lane12
+ls -d S* > list.lane
+while read file; do cat ./$file/*.fastq.gz > $file.fastq.gz; done < list.lane
+
+....
+....
+```
+
 ##### 2. Run fastqc on raw files
 
       #Change into each of the 12 directories; create list of .fastq.gz files; make fastqc output dir and run fastqc
