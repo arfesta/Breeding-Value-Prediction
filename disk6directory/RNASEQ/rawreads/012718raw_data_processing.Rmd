@@ -2,7 +2,7 @@
 *Raw mRNA sequencing libraries returned from the GSL are located at:
 
     ```linux
-     /media/disk6/ARF/RNASEQ/rawreads/EWtarfiles && LGEPtarfiles
+        /media/disk6/ARF/RNASEQ/rawreads/EWtarfiles && LGEPtarfiles
     ```
  
 *Within the LGEP directory there are 18 .tar files (144 biological samples) and then an additional directory which includes tar files from the first run of sequencing.
