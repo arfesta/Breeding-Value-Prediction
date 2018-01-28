@@ -128,7 +128,7 @@
 *Initially Sample 84 had rRNA and adapter contamination.  After running bbduk there was still one overresprestned sequence which when blasted hit to a tumor response protein.  Since this is biologicaly relevenat it should be OK to stay.  We can use bbduk now to process all raw reads.
 
 *Article suggest low to minimium quality trimming works best: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4766705/
-Also minimum read length for DE expression roughly 50 works: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4531809/
+*Also minimum read length for DE expression roughly 50 works: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4531809/
 
 First run on the EW technical reps a single sample at a time
 
