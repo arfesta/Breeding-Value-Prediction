@@ -58,7 +58,7 @@
 *805 Accessions showed up in results and were downloaded.  The original .tgz is located at 
 
 ```linux
-/media/disk6/ARF/RNASEQ/software/arb-silva.de_2018-1-28_id495187.tgz
+/media/disk6/ARF/RNASEQ/software/arb-silva.de_2018-01-28_id495190.tgz
 ```
 
 *The .fasta file inside the .tgz was placed in:
