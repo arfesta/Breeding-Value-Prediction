@@ -1,1 +1,22 @@
 # 1/29/18 SNP calling notes
+
+*Raw tar files returned from GSL were extracted and names of folders were changed to correspond to a single pool (lane) run for each batch.  The .fastq.gz files for each library were QC'ed with fastqc and then adapters/contamination was removed using bbduk.  The filtered and trimmed reads are located at:
+
+```linux
+/media/disk6/ARF/RNASEQ/trimmedfiltreads
+```
+
+*The above path is the starting directory for processing SNPs.  Notes of lane extraction, fastqc, and filter/trim processing are on git at:
+
+```linux
+Breeding-Value-Prediction/disk6directory/RNASEQ/rawreads/processingnotes
+```
+
+## 1. Align .fastq.gz techincal reps to 86K transcriptome with bowtie
+## 2. Convert sam file to bam
+## 3. Merge technical rep bam files
+## 4. Sort biological rep bam file
+## 5. Mark/remove duplicates within bam files
+## 6. Add RG & SM to each biological rep
+## 7. Provide list of bams to freebayes and call SNPs
+## 8. Filter VCF for no missing SNPs
