@@ -48,7 +48,7 @@
  while read file; do tar -xf ./$file --directory ../LGEPfasta/; done < LGEP.tar.list
  ```    
 
-    *lanes 11,12,13,14,15,16 have folders of 24 samples with 3 smaller .fasta.gz files within each folder corresponding to that sample.  These samples need to be merged for further processing to be identified as one single techincal rep.
+*lanes 11,12,13,14,15,16 have folders of 24 samples with 3 smaller .fasta.gz files within each folder corresponding to that sample.  These samples need to be merged for further processing to be identified as one single techincal rep.
 
  ```linux
  cd /media/disk6/ARF/RNASEQ/rawreads/LGEPfasta/lane11
@@ -65,7 +65,7 @@
 
 #### 2. Run fastqc on raw files
 
-      #Change into each of the 12 directories; create list of .fastq.gz files; make fastqc output dir and run fastqc
+*Change into each of the 12 directories; create list of .fastq.gz files; make fastqc output dir and run fastqc
   
  ```linux 
  cd /media/disk6/ARF/RNASEQ/rawreads/EWfasta/lane10
@@ -81,7 +81,7 @@
  ...
  ```
      
-        #Change into each of the 18 directories; create list of .fastq.gz files; make fastqc output dir and run fastqc
+ *Change into each of the 18 directories; create list of .fastq.gz files; make fastqc output dir and run fastqc
         
  ```linux 
  cd /media/disk6/ARF/RNASEQ/rawreads/LGEPfasta/lane10
@@ -183,7 +183,7 @@ while read file; do ./software/Salmon/bin/salmon quant --seqBias -r ./trimmedfil
 
 
 ``` 
-  *Then align counts and place in counts folder
+*Then align counts and place in counts folder
   
  
 #### 6. Align reads with bowtie to 86k 
