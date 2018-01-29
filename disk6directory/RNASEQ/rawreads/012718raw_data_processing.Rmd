@@ -48,7 +48,7 @@
  while read file; do tar -xf ./$file --directory ../LGEPfasta/; done < LGEP.tar.list
  ```    
 
-    #lanes 11,12,13,14,15,16 have folders of 24 samples with 3 smaller .fasta.gz files within each folder corresponding to that sample.  These samples need to be merged for further processing to be identified as one single techincal rep.
+    *lanes 11,12,13,14,15,16 have folders of 24 samples with 3 smaller .fasta.gz files within each folder corresponding to that sample.  These samples need to be merged for further processing to be identified as one single techincal rep.
 
  ```linux
  cd /media/disk6/ARF/RNASEQ/rawreads/LGEPfasta/lane11
@@ -130,7 +130,7 @@
 *Article suggest low to minimium quality trimming works best: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4766705/
 *Also minimum read length for DE expression roughly 50 works: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4531809/
 
-First run on the EW technical reps a single sample at a time
+*First run on the EW technical reps a single sample at a time
 
 ```linux
 cd /media/disk6/ARF/RNASEQ
@@ -144,7 +144,7 @@ while read file; do ./software/bbmap/bbduk.sh -Xmx3g in=./rawreads/EWfasta/lane0
 /media/disk6/ARF/RNASEQ/trimmedfiltreads/EW/lane01 
 ```
 
-Now run on the LGEP technical reps a single sample at a time
+*Now run on the LGEP technical reps a single sample at a time
 
 ```linux
 while read file; do ./software/bbmap/bbduk.sh -Xmx3g in=./rawreads/LGEPfasta/lane01/$file out=./trimmedfiltreads/LGEP/lane01/$file ref=./software/bbmap/resources/truseq.fa.gz,./software/bbmap/resources/rRNA_lob_pine.fasta forcetrimleft=10 t=5 ktrim=r k=25 mink=12 hdist=1 hdist2=0 qtrim=rl trimq=20 minlength=50 ; done < ./rawreads/LGEPfasta/lane01/lane01.list
@@ -165,7 +165,7 @@ All lanes are processed the same way by changing the lane numbers in the bbduk c
 ./software/Salmon/bin/salmon index -t ./references/Pita.86ktxptome.fasta -i ./references/Pita.86k -p 5 --perfectHash --type "quasi" -k 25
 ```
 
-#Salmon fld flags that it says are important for single end reads.  Need to loook into this further.
+*Salmon fld flags that it says are important for single end reads.  Need to loook into this further.
 
 ``` linux
 cd /media/disk6/ARF/RNASEQ
@@ -183,7 +183,7 @@ while read file; do ./software/Salmon/bin/salmon quant --seqBias -r ./trimmedfil
 
 
 ``` 
-  #Then align counts and place in counts folder
+  *Then align counts and place in counts folder
   
  
 #### 6. Align reads with bowtie to 86k 
