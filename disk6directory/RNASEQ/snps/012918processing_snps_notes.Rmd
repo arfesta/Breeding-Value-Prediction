@@ -12,7 +12,14 @@
 Breeding-Value-Prediction/disk6directory/RNASEQ/rawreads/processingnotes
 ```
 
+*Below is a list of all steps. First each step will be practiced and once a final method for each step is determined a pipe command will be built for as many steps as possible.
+
 ## 1. Align .fastq.gz techincal reps to 86K transcriptome with bowtie
+
+*Practice:
+
+
+
 ## 2. Convert sam file to bam
 ## 3. Merge technical rep bam files
 ## 4. Sort biological rep bam file
