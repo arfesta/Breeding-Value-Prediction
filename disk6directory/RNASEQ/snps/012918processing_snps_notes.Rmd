@@ -16,9 +16,18 @@ Breeding-Value-Prediction/disk6directory/RNASEQ/rawreads/processingnotes
 
 ## 1. Align .fastq.gz techincal reps to 86K transcriptome with bowtie
 
-*Practice:
+*Build bowtie2 index:
 
+```linux
+cd /media/disk6/ARF/RNASEQ
+./software/bowtie/bowtie2-build -f ./references/Pita.86ktxptome.fasta Pita.86k
+```
 
+*Practice run bowtie2:
+
+```linux
+./software/bowtie/bowtie2 -p 10 -x ./references/Pita.86k -U ./trimmedfiltreads/EW/lane01/96_S12_L001_R1_001.fastq.gz -S out.sam
+```
 
 ## 2. Convert sam file to bam
 ## 3. Merge technical rep bam files
