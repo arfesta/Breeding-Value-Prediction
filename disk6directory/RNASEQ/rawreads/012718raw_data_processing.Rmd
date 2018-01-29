@@ -1,4 +1,7 @@
-## 1/27/18
+# 1/27/18
+
+### Location of raw data
+
 *Raw mRNA sequencing libraries returned from the GSL are located at:
 
  ```linux
