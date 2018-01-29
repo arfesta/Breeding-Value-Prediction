@@ -7,7 +7,9 @@
  ```linux
  /media/disk6/ARF/RNASEQ/rawreads/EWtarfiles && LGEPtarfiles
  ```
- 
+
+### Extracting LGEP tar files
+
   *Within the LGEP directory there are 18 .tar files (144 biological samples) and then an additional directory which    includes tar files from the first run of sequencing. The 18 tar files were delivered at two seperate times:
      
   *First set included 6 tar files labeled: 
@@ -27,7 +29,9 @@
       -lane13:lane18 corresponding to Z1:Z6
      
    *Note sample in lane12 tar file 11x really belongs to lane11 so it was moved there.
-     
+
+### Extracting EW tar files
+
 *Within the EW directory there are 12 .tar files (96 biological samples). The 12 tar files were delivered at two seperate times:
      
   *First set included 4 tar files labeled: 
