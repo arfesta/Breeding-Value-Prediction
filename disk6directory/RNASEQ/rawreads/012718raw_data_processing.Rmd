@@ -159,13 +159,34 @@ All lanes are processed the same way by changing the lane numbers in the bbduk c
 #### 4. FastQC can be re-done on filtered and trimmed files
 
 #### 5. Aligning reads to 86K transcriptome with Salmon
-  #First index the 86k transcriptome:
+
+*First index the 86k transcriptome:
+*p = 5 (five threads)
+*type = quasi (quasi-based mapping recommended)
+*k = 25 (A k of 31 is good for minimum read length = 75, but our minimum read length is 50)
+*perfectHash (takes a little longer to build index but faster for quant command)
 
 ```linux
 ./software/Salmon/bin/salmon index -t ./references/Pita.86ktxptome.fasta -i ./references/Pita.86k -p 5 --perfectHash --type "quasi" -k 25
 ```
 
 *Salmon fld flags that it says are important for single end reads.  Need to loook into this further.
+*Appears that this is a requirement of all kmer based methods and probably corresponds to the cDNA input size, therefore the default setting should be OK.
+
+*p = 40 (use 40 threads)
+*l = U (library is unstranded)
+*numBootstraps = 2
+
+```linux
+Salmon has the ability to optionally compute bootstrapped abundance estimates. This is done by resampling (with replacement) from the counts assigned to the fragment equivalence classes, and then re-running the optimization procedure, either the EM or VBEM, for each such sample. The values of these different bootstraps allows us to assess technical variance in the main abundance estimates we produce. Such estimates can be useful for downstream (e.g. differential expression) tools that can make use of such uncertainty estimates. This option takes a positive integer that dictates the number of bootstrap samples to compute. The more samples computed, the better the estimates of varaiance, but the more computation (and time) required.
+```
+
+*seqBias
+
+```linux
+Passing the --seqBias flag to Salmon will enable it to learn and correct for sequence-specific biases in the input data. Specifically, this model will attempt to correct for random hexamer priming bias, which results in the preferential sequencing of fragments starting with certain nucleotide motifs. By default, Salmon learns the sequence-specific bias parameters using 1,000,000 reads from the beginning of the input. If you wish to change the number of samples from which the model is learned, you can use the --numBiasSamples parameter. Salmon uses a variable-length Markov Model (VLMM) to model the sequence specific biases at both the 5’ and 3’ end of sequenced fragments. This methodology generally follows that of Roberts et al. [2], though some details of the VLMM differ.
+```
+
 
 ``` linux
 cd /media/disk6/ARF/RNASEQ
