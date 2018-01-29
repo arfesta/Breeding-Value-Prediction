@@ -25,15 +25,19 @@
      
    *Note sample in lane12 tar file 11x really belongs to lane11 so it was moved there.
      
-*Within the EW directory there are 12 .tar files (96 biological samples)
-  
-  *The 12 tar files were delivered at two seperate times
+*Within the EW directory there are 12 .tar files (96 biological samples). The 12 tar files were delivered at two seperate times:
      
-  *First set included 4 tar files labeled: 20151203-GSL-046-B-Whetten-Pool9 && 10,11,12
+  *First set included 4 tar files labeled: 
+      
+      -20151203-GSL-046-B-Whetten-Pool9 && 10,11,12
      
-  *Second set included 8 tar files labeled: GSL-047-A-Whetten-Pool1 && 2,3,4,5,6,7,8
+  *Second set included 8 tar files labeled: 
   
-  *The names of directories were manually edited to be lane01:lane12 corresponding to Pool  
+      -GSL-047-A-Whetten-Pool1 && 2,3,4,5,6,7,8
+  
+  *The names of directories were manually edited to be
+   
+      -lane01:lane12 corresponding to Pool  
   
       
 #### 1. Untar sequencing lanes
