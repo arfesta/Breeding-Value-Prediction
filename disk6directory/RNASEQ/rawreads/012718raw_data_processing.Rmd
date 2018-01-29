@@ -161,9 +161,13 @@ All lanes are processed the same way by changing the lane numbers in the bbduk c
 #### 5. Aligning reads to 86K transcriptome with Salmon
 
 *First index the 86k transcriptome:
+
 *p = 5 (five threads)
+
 *type = quasi (quasi-based mapping recommended)
+
 *k = 25 (A k of 31 is good for minimum read length = 75, but our minimum read length is 50)
+
 *perfectHash (takes a little longer to build index but faster for quant command)
 
 ```linux
@@ -171,10 +175,13 @@ All lanes are processed the same way by changing the lane numbers in the bbduk c
 ```
 
 *Salmon fld flags that it says are important for single end reads.  Need to loook into this further.
+
 *Appears that this is a requirement of all kmer based methods and probably corresponds to the cDNA input size, therefore the default setting should be OK.
 
 *p = 40 (use 40 threads)
+
 *l = U (library is unstranded)
+
 *numBootstraps = 2
 
 ```linux
