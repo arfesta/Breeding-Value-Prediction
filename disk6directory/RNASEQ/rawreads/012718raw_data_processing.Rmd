@@ -47,7 +47,7 @@
       -lane01:lane12 corresponding to Pool  
   
       
-#### 1. Untar sequencing lanes
+## 1. Untar sequencing lanes
 
  ```linux
  cd /media/disk6/ARF/RNASEQ/rawreads/EWtarfiles
