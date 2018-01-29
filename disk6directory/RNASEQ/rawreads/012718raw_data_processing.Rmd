@@ -5,7 +5,7 @@
  /media/disk6/ARF/RNASEQ/rawreads/EWtarfiles && LGEPtarfiles
  ```
  
-*Within the LGEP directory there are 18 .tar files (144 biological samples) and then an additional directory which includes tar files from the first run of sequencing.
+  *Within the LGEP directory there are 18 .tar files (144 biological samples) and then an additional directory which    includes tar files from the first run of sequencing.
    
    *The 18 tar files were delivered at two seperate times
      
