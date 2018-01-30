@@ -26,7 +26,14 @@ cd /media/disk6/ARF/RNASEQ
 *Practice run bowtie2:
 
 ```linux
-./software/bowtie/bowtie2 -p 10 -x ./references/Pita.86k -U ./trimmedfiltreads/EW/lane01/96_S12_L001_R1_001.fastq.gz -S out.sam
+./software/bowtie/bowtie2 -p 60 -x ./references/Pta.86k -U ./trimmedfiltreads/EW/lane01/96_S12_L001_R1_001.fastq.gz -S out.sam
+```
+*The above outputs a .sam file that is uncompressed
+
+*The below puts out a .bam file that is compressed. Note that when using samtools view "q" can be used to filter low quality reads. Should this be used?
+
+```linux
+while read file; do ./software/bowtie/bowtie2 -p 60 -x ./references/Pta.86k -U ./trimmedfiltreads/EW/lane01/$file | ./software/samtools-1.6/samtools view -@ 60 -b1 - -o ./snps/86k/EW/lane01/$file; done < ./rawreads/EWfasta/lane01/lane01.list
 ```
 
 ## 2. Convert sam file to bam
