@@ -75,7 +75,7 @@ while read file; do ./software/samtools-1.6/samtools sort -m 5G -@ 20 ./snps/86k
 while read file; do ./software/samtools-1.6/samtools sort -m 5G -@ 20 ./snps/86k/LGEP/lane18/$file | ./software/samtools-1.6/samtools markdup -rs -@ 20 - ./snps/86k/LGEP/lane18/sort.rmdup/$file; done < ./rawreads/LGEPfasta/lane18/lane18.list
 
 ```
-***Note: Once finished, unsorted and duplicated bam technical reps were deleted.  The newly cread bam files within the ./sort.rmdup were then moved in place of the deleted unsorted and duplicated bams.
+***Note: Once finished, unsorted and duplicated bam technical reps were deleted.  The newly created bam files within the ./sort.rmdup directory were then moved in place of the deleted unsorted and duplicated bams. Finally the ./sort.rmdup folder was deleted
 
 ## 3. Merge technical rep bam files
 ## 4. Sort biological rep bam file
