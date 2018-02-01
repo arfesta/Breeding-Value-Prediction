@@ -83,6 +83,17 @@ while read file; do ./software/samtools-1.6/samtools sort -m 5G -@ 20 ./snps/86k
 /media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools faidx /media/disk6/ARF/RNASEQ/references/Pita.86ktxptome.fasta
 
 ## 3. Merge technical rep bam files
+
+'''linux
+cd /media/disk6/ARF/RNASEQ/snps/86k/EW/
+
+while read file; do ls -R */*/$file*.fastq.gz >out.txt;/media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools merge -1 -b out.txt -@ 60 ./$file.ew.bio.rep.merge.bam ;done < test
+
+cd /media/disk6/ARF/RNASEQ/snps/86k/LGEP/
+
+while read file; do ls -R */*/$file*.fastq.gz >out.txt;/media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools merge -1 -b out.txt -@ 60 ./$file.lgep.bio.rep.merge.bam ;done < test
+'''
+
 ## 4. Sort biological rep bam file
 ## 5. Mark/remove duplicates within bam files
 ## 6. Add RG & SM to each biological rep
