@@ -151,5 +151,27 @@ while read file; do java -jar ./software/picard-2.17.4/picard.jar AddOrReplaceRe
 
 ## 6. Merge and Sort biological reps into final bam
 
+cd /media/disk6/ARF/RNASEQ/snps/86k/EW/bio.sort.rmdup/msd.wrg
+
+ls > merge.all.ew
+
+/media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools merge -1 -b ./merge.all.ew -@ 60 EW.snps.merged.bam
+
+/media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools index -@ 60 -b ./EW.snps.merged.bam
+
+cd /media/disk6/ARF/RNASEQ/snps/86k/LGEP/bio.sort.rmdup/msd.wrg
+
+ls > merge.all.lgep
+
+/media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools merge -1 -b ./merge.all.lgep -@ 60 LGEP.snps.merged.bam
+
 ## 7. Provide full ew and lgep bam to freebayes
+
+Run Freebayes
+started at 530pm ct 2/218
+```linux
+cd /RNASEQ/snps/86k/EW/bio.sort.rmdup/msd.wrg
+
+/home/rosswhet/software/freebayes/scripts/freebayes-parallel <(/home/rosswhet/software/freebayes/scripts/fasta_generate_regions.py /media/disk6/ARF/RNASEQ/references/Pita.86ktxptome.fasta.fai 100000) 60 -f /media/disk6/ARF/RNASEQ/references/Pita.86ktxptome.fasta -b /media/disk6/ARF/RNASEQ/snps/86k/EW/bio.sort.rmdup/msd.wrg/EW.snps.merged.bam | bgzip -c > ew.bam.freebayes.out.vcf.gz
+```
 ## 8. Filter VCF for no missing SNPs
