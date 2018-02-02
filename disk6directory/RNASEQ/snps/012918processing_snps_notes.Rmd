@@ -1,4 +1,4 @@
-# 1/29/18 SNP calling notes
+# 1/29/18 - 2/1/18 SNP calling notes
 
 *Raw tar files returned from GSL were extracted and names of folders were changed to correspond to a single pool (lane) run for each batch.  The .fastq.gz files for each library were QC'ed with fastqc and then adapters/contamination was removed using bbduk.  The filtered and trimmed reads are located at:
 
@@ -77,25 +77,79 @@ while read file; do ./software/samtools-1.6/samtools sort -m 5G -@ 20 ./snps/86k
 while read file; do ./software/samtools-1.6/samtools sort -m 5G -@ 20 ./snps/86k/LGEP/lane18/$file | ./software/samtools-1.6/samtools markdup -rs -@ 20 - ./snps/86k/LGEP/lane18/sort.rmdup/$file; done < ./rawreads/LGEPfasta/lane18/lane18.list
 
 ```
-***Note: Once finished, unsorted and duplicated bam technical reps were deleted.  The newly created bam files within the ./sort.rmdup directory were then moved in place of the deleted unsorted and duplicated bams. Finally the ./sort.rmdup folder was deleted
+***Note: Once finished, unsorted and duplicated bam technical reps were deleted.  The newly created bam files within the ./sort.rmdup directory will be kept as source of techincal reps. 
 
 *Create samtools index for mpileup
 /media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools faidx /media/disk6/ARF/RNASEQ/references/Pita.86ktxptome.fasta
 
 ## 3. Merge technical rep bam files
 
-'''linux
-cd /media/disk6/ARF/RNASEQ/snps/86k/EW/
+```linux
+ cd /media/disk6/ARF/RNASEQ/snps/86k/EW/
 
-while read file; do ls -R */*/$file*.fastq.gz >out.txt;/media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools merge -1 -b out.txt -@ 60 ./$file.ew.bio.rep.merge.bam ;done < test
+ while read file; do ls -R */*/$file*.fastq.gz >out.txt;/media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools merge -1 -b    out.txt -@ 60 ./$file.ew.bio.rep.merge.bam ;done < test
 
-cd /media/disk6/ARF/RNASEQ/snps/86k/LGEP/
+ cd /media/disk6/ARF/RNASEQ/snps/86k/LGEP/
 
-while read file; do ls -R */*/$file*.fastq.gz >out.txt;/media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools merge -1 -b out.txt -@ 60 ./$file.lgep.bio.rep.merge.bam ;done < test
-'''
+ while read file; do ls -R */*/Sample_$file*.fastq.gz >out.txt;/media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools merge -1 -b  out.txt -@ 60 ./$file.lgep.bio.rep.merge.bam ;done < test
 
-## 4. Sort biological rep bam file
-## 5. Mark/remove duplicates within bam files
-## 6. Add RG & SM to each biological rep
-## 7. Provide list of bams to freebayes and call SNPs
+ /media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools merge -1 -b out.txt -@ 60 ./$file.lgep.bio.rep.merge.bam
+```
+
+## 4. Sort biological rep bam file & Remove duplicates
+
+*Create new directory to hold sorted and de-duplicated biological reps & run samtools
+ ```linux
+ mkdir bio.sort.rmdup
+ 
+ ls *.bam > test
+
+cd ../../..
+ 
+while read file; do ./software/samtools-1.6/samtools sort -m 5G -@ 40 ./snps/86k/EW/$file | ./software/samtools-1.6/samtools markdup -rs -@ 60 - ./snps/86k/EW/bio.sort.rmdup/$file; done < ./snps/86k/EW/test
+ ```
+*Do the same for LGEP
+ ```linux
+cd /media/disk6/ARF/RNASEQ/snps/86k/LGEP
+ 
+mkdir bio.sort.rmdup
+
+ls *.bam > test
+
+cd ../../..
+ 
+while read file; do ./software/samtools-1.6/samtools sort -m 5G -@ 60 ./snps/86k/LGEP/$file | ./software/samtools-1.6/samtools markdup -rs -@ 60 - ./snps/86k/LGEP/bio.sort.rmdup/$file; done < ./snps/86k/LGEP/test
+ ```
+*As before old files were deleted and files were kept in ./bio.sort.rmdup
+
+## 5. Add RG & SM to each biological rep
+
+```linux
+cd /media/disk6/ARF/RNASEQ/snps/86k/EW/bio.sort.rmdup
+
+mkdir msd.wrg
+
+ls *.bam > add.rgs
+
+cd /media/disk6/ARF/RNASEQ/
+
+while read file; do java -jar ./software/picard-2.17.4/picard.jar AddOrReplaceReadGroups I=./snps/86k/EW/bio.sort.rmdup/$file O=snps/86k/EW/bio.sort.rmdup/msd.wrg/$file RGID=$file RGLB=$file RGPL=illumina RGPU=$file RGSM=$file ; done < ./snps/86k/EW/bio.sort.rmdup/add.rgs
+```
+
+```linux
+cd /media/disk6/ARF/RNASEQ/snps/86k/LGEP/bio.sort.rmdup
+
+mkdir msd.wrg
+
+ls *.bam > add.rgs
+
+cd /media/disk6/ARF/RNASEQ/
+
+while read file; do java -jar ./software/picard-2.17.4/picard.jar AddOrReplaceReadGroups I=./snps/86k/LGEP/bio.sort.rmdup/$file O=snps/86k/LGEP/bio.sort.rmdup/msd.wrg/$file RGID=$file RGLB=$file RGPL=illumina RGPU=$file RGSM=$file ; done < ./snps/86k/LGEP/bio.sort.rmdup/add.rgs
+
+```
+
+## 6. Merge and Sort biological reps into final bam
+
+## 7. Provide full ew and lgep bam to freebayes
 ## 8. Filter VCF for no missing SNPs
