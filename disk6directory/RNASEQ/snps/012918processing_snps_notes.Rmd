@@ -177,5 +177,7 @@ cd /RNASEQ/snps/86k/EW/bio.sort.rmdup/msd.wrg
 ## 8. Filter VCF for no missing SNPs
 
 ```linux
+ bcftools merge --threads 60 ./EW/bio.sort.rmdup/msd.wrg/ew.bam.freebayes.out.vcf.gz ./LGEP/bio.sort.rmdup/msd.wrg/lgep.bam.freebayes.out.vcf.gz  > 192.biorep.vcf.gz
+
 vcftools --gzvcf ./ew.bam.freebayes.out.vcf.gz --remove-indels --max-missing 1.0 --maf 0.05 --min-meanDP 10  --012 
 ```
