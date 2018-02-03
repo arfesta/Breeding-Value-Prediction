@@ -12,8 +12,6 @@
 Breeding-Value-Prediction/disk6directory/RNASEQ/rawreads/processingnotes
 ```
 
-*Below is a list of all steps. First each step will be practiced and once a final method for each step is determined a pipe command will be built for as many steps as possible.
-
 ## 1. Build index of 86k transcriptome
 
 *Build bowtie2 index:
@@ -78,9 +76,6 @@ while read file; do ./software/samtools-1.6/samtools sort -m 5G -@ 20 ./snps/86k
 
 ```
 ***Note: Once finished, unsorted and duplicated bam technical reps were deleted.  The newly created bam files within the ./sort.rmdup directory will be kept as source of techincal reps. 
-
-*Create samtools index for mpileup
-/media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools faidx /media/disk6/ARF/RNASEQ/references/Pita.86ktxptome.fasta
 
 ## 3. Merge technical rep bam files
 
@@ -149,7 +144,7 @@ while read file; do java -jar ./software/picard-2.17.4/picard.jar AddOrReplaceRe
 
 ```
 
-## 6. Merge and Sort biological reps into final bam
+## 6. Merge biological reps into final bam represnting EW & LGEP resepctively
 
 ```linux
 cd /media/disk6/ARF/RNASEQ/snps/86k/EW/bio.sort.rmdup/msd.wrg
@@ -179,6 +174,7 @@ cd /RNASEQ/snps/86k/EW/bio.sort.rmdup/msd.wrg
 
 /home/rosswhet/software/freebayes/scripts/freebayes-parallel <(/home/rosswhet/software/freebayes/scripts/fasta_generate_regions.py /media/disk6/ARF/RNASEQ/references/Pita.86ktxptome.fasta.fai 100000) 60 -f /media/disk6/ARF/RNASEQ/references/Pita.86ktxptome.fasta -b /media/disk6/ARF/RNASEQ/snps/86k/EW/bio.sort.rmdup/msd.wrg/EW.snps.merged.bam | bgzip -c > ew.bam.freebayes.out.vcf.gz
 ```
+
 ## 8. Tabix output vcf files, merge both vcf files, filter
 
 ```linux
