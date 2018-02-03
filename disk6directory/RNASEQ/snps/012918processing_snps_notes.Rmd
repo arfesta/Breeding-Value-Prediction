@@ -151,6 +151,7 @@ while read file; do java -jar ./software/picard-2.17.4/picard.jar AddOrReplaceRe
 
 ## 6. Merge and Sort biological reps into final bam
 
+```linux
 cd /media/disk6/ARF/RNASEQ/snps/86k/EW/bio.sort.rmdup/msd.wrg
 
 ls > merge.all.ew
@@ -158,12 +159,16 @@ ls > merge.all.ew
 /media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools merge -1 -b ./merge.all.ew -@ 60 EW.snps.merged.bam
 
 /media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools index -@ 60 -b ./EW.snps.merged.bam
+```
 
+```linux
 cd /media/disk6/ARF/RNASEQ/snps/86k/LGEP/bio.sort.rmdup/msd.wrg
 
 ls > merge.all.lgep
 
 /media/disk6/ARF/RNASEQ/software/samtools-1.6/samtools merge -1 -b ./merge.all.lgep -@ 60 LGEP.snps.merged.bam
+
+```
 
 ## 7. Provide full ew and lgep bam to freebayes
 
@@ -174,10 +179,26 @@ cd /RNASEQ/snps/86k/EW/bio.sort.rmdup/msd.wrg
 
 /home/rosswhet/software/freebayes/scripts/freebayes-parallel <(/home/rosswhet/software/freebayes/scripts/fasta_generate_regions.py /media/disk6/ARF/RNASEQ/references/Pita.86ktxptome.fasta.fai 100000) 60 -f /media/disk6/ARF/RNASEQ/references/Pita.86ktxptome.fasta -b /media/disk6/ARF/RNASEQ/snps/86k/EW/bio.sort.rmdup/msd.wrg/EW.snps.merged.bam | bgzip -c > ew.bam.freebayes.out.vcf.gz
 ```
-## 8. Filter VCF for no missing SNPs
+## 8. Tabix output vcf files, merge both vcf files, filter
+
+```linux
+cd /RNASEQ/snps/86k/EW/bio.sort.rmdup/msd.wrg
+
+tabix ./ew.bam.freebayes.out.vcf.gz
+
+cd /RNASEQ/snps/86k/LGEP/bio.sort.rmdup/msd.wrg
+
+taxib ./lgep.bam.freebayes.out.vcf.gz
+```
 
 ```linux
  bcftools merge --threads 60 ./EW/bio.sort.rmdup/msd.wrg/ew.bam.freebayes.out.vcf.gz ./LGEP/bio.sort.rmdup/msd.wrg/lgep.bam.freebayes.out.vcf.gz  > 192.biorep.vcf.gz
-
+ 
+ cd /RNASEQ
+ 
+ tabix 192.biorep.vcf.gz
+ ```
+ 
+``` linux
 vcftools --gzvcf ./ew.bam.freebayes.out.vcf.gz --remove-indels --max-missing 1.0 --maf 0.05 --min-meanDP 10  --012 
 ```
