@@ -175,3 +175,7 @@ cd /RNASEQ/snps/86k/EW/bio.sort.rmdup/msd.wrg
 /home/rosswhet/software/freebayes/scripts/freebayes-parallel <(/home/rosswhet/software/freebayes/scripts/fasta_generate_regions.py /media/disk6/ARF/RNASEQ/references/Pita.86ktxptome.fasta.fai 100000) 60 -f /media/disk6/ARF/RNASEQ/references/Pita.86ktxptome.fasta -b /media/disk6/ARF/RNASEQ/snps/86k/EW/bio.sort.rmdup/msd.wrg/EW.snps.merged.bam | bgzip -c > ew.bam.freebayes.out.vcf.gz
 ```
 ## 8. Filter VCF for no missing SNPs
+
+```linux
+vcftools --gzvcf ./ew.bam.freebayes.out.vcf.gz --remove-indels --max-missing 1.0 --maf 0.05 --min-meanDP 10  --012 
+```
