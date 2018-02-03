@@ -194,5 +194,9 @@ taxib ./lgep.bam.freebayes.out.vcf.gz
  ```
  
 ``` linux
-vcftools --gzvcf ./ew.bam.freebayes.out.vcf.gz --remove-indels --max-missing 1.0 --maf 0.05 --min-meanDP 10  --012 
+vcftools --gzvcf ./192.biorep.vcf.bgzip.gz --remove-indels --max-missing 1.0 --maf 0.05 --min-meanDP 10  --012 
+```
+
+```linux
+vcftools --gzvcf ./192.biorep.vcf.bgzip.gz --remove-indels --max-missing 1.0 --maf 0.05 --min-meanDP 10  --relatedness2 
 ```
