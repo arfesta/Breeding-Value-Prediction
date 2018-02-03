@@ -192,9 +192,7 @@ taxib ./lgep.bam.freebayes.out.vcf.gz
 ```
 
 ```linux
- bcftools merge --threads 60 ./EW/bio.sort.rmdup/msd.wrg/ew.bam.freebayes.out.vcf.gz ./LGEP/bio.sort.rmdup/msd.wrg/lgep.bam.freebayes.out.vcf.gz  > 192.biorep.vcf.gz
- 
- bgzip -c ./192.biorep.vcf.gz > ./192.biorep.vcf.bgzip.gz
+ bcftools merge --threads 60 ./EW/bio.sort.rmdup/msd.wrg/ew.bam.freebayes.out.vcf.gz ./LGEP/bio.sort.rmdup/msd.wrg/lgep.bam.freebayes.out.vcf.gz  | bgzip -c > ./192.biorep.vcf.bgzip.gz
  
  tabix 192.biorep.vcf.gz
  ```
