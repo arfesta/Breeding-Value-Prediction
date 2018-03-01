@@ -5,6 +5,10 @@ Directory contains filtered and trimmed reads.
 To clarify the index for each technical replicate the following command was done
 
 ````
-while read file; do gzip -cd ./50_S84_L008_R1_001.fastq.gz |head -1 | grep '^@D00555' | cut -d : -f 10 | sort | uniq -c | sort -nr  >> out.txt; done < all.fastqs
+arfesta@titan:/media/disk6/ARF/RNASEQ/trimmedfiltreads/EW$ 
+while read file; do gzip -cd $file |head -1 | grep '^@D00555' | cut -d : -f 10 | sort | uniq -c | sort -nr  >> all_indicies.txt; done < all.ew.reps
+
+arfesta@titan:/media/disk6/ARF/RNASEQ/trimmedfiltreads/LGEP$ 
+while read file; do gzip -cd $file |head -100 | grep '^@HISEQ' | cut -d : -f 10 | sort | uniq -c | sort -nr  >> all_indicies.txt; done < all.lgep.reps
 
 ````
