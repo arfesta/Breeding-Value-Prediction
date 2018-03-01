@@ -1,0 +1,9 @@
+Directory contains filtered and trimmed reads.
+    --Reads from rawreads folder were filtered and trimmed using bbduk and placed in this folder
+#Edit 3/1
+
+To clarify the index for each technical replicate the following command was done
+
+````
+zless ./50_S84_L008_R1_001.fastq.gz | grep '^@D00555' | cut -d : -f 10 | sort | uniq -c | sort -nr  > out.tx
+````
