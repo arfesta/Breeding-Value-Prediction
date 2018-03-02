@@ -178,6 +178,8 @@ while read file; do ./software/bbmap/bbduk.sh -Xmx3g in=./rawreads/LGEPfasta/lan
 
 All lanes are processed the same way by changing the lane numbers in the bbduk command.
 
+Note:After processing Sample_101b in lane10 for LGEP file was much smaller, re-ran again on that file at a later time so file date is newer.
+
 ## 4. FastQC can be re-done on filtered and trimmed files
 
 ## 5. Aligning reads to 86K transcriptome with Salmon
