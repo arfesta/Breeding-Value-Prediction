@@ -1,15 +1,11 @@
----
+
 title: "Step1: Load Raw counts + Phenos"
 author: "Adam Festa"
 date: "March 2, 2018"
 output: 
   html_document: 
     toc: yes
----
 
-```{r setup, include=TRUE,echo=F}
-knitr::opts_knit$set(root.dir="/media/disk6/ARF/RNASEQ/")
-```
 
 ## 1. Set working env and locate count file path
 
