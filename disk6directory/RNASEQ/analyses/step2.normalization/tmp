@@ -1,0 +1,46 @@
+---
+title: "Prediction using Tech -> Bio norm counts"
+author: "Adam Festa"
+date: "March 2, 2018"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Prediction of EW using LGEP Case 1
+
+The general purpose of this script is to pred the ew families using the lgep with a normalizaiton scheme that was done on techincal reps.
+
+### 1. Environment set-up
+First set working directory and load packages. In this script we are going to use the normalized count values returned from using 576 techincal reps down to 192 with sommer adjusting for lane, index, and pedigree. 
+
+```{r wd.pkg, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+setwd("/media/disk6/ARF/RNASEQ/analyses")
+packages <- list("dplyr","parallel","Metrics","caret","OmicKriging")
+packages <- (lapply(X = packages,library,character.only=T))
+trash <- (gc(verbose = F));rm(packages,trash);
+```
+\
+
+Load in those counts and expt data here - make sure to check that the rownames of the counts match the rownames of the phenotype data.
+```{r load.counts}
+#Expermintal data:
+load("/media/disk6/ARF/RNASEQ/analyses/step2.normalization/dplyr.bio.norm/192.expt.data.Rdata")
+#Count data:
+load("/media/disk6/ARF/RNASEQ/analyses/step2.normalization/dplyr.bio.norm/192.norm.log.count.lig.Rdata")
+```
+
+Here is the phenos object:
+```{r check.phenos}
+head(expt.dat.192)
+```
+
+Here is the phenos object:
+```{r check.counts}
+salmon.bio.norm.counts[1:5,1:3]
+```
+
+Make sure rownames are identical:
+```{r sanity.check.1}
+identical(rownames(salmon.bio.norm.counts),expt.dat.192$animal.id)
+```
