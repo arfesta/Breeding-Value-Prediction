@@ -25,7 +25,7 @@ Extract meta data from file path for all 720 technical replicates:####
 \
 \
 EXAMPLE : First a file name extract the lane by splitting each file name on "/" and selecting the 5th element, which corresponds to lane id.
-```{r ept.dat.extrac.ex}
+```
 each.file=1
 split.file.name <- strsplit(x=countfiles[each.file],split = "/")[[1]]
 split.file.name
@@ -33,21 +33,22 @@ lane.name <- split.file.name[5]
 ```
 \
 The 6th elelment of that vector contains the sample name.  We can split that sample to extract sample information
-```{r ssn}
+
+```
 split.samp.name <- strsplit(split.file.name[6],split = "_")[[1]]
 samp.name <- split.samp.name[1]
-
-lane.name; samp.name
 ```
+
   \
   The 2nd element of the above vector contains the index ID
-```{r raw.index}
-index <- split.samp.name[2]
-index
+  
 ```
+index <- split.samp.name[2]
+```
+
 \
 Long story short: The index on sample file names is different between the two batches. A sepearate check was done on the raw fastq's to make sure that indicies were assigned correctly. This part can be ignored as its no longer used in normalization
-```{r gen.index}
+```
   index <- as.numeric(gsub(pattern = "S",replacement = "",x = index))
   if(index < 25){index <- index} 
   if(index > 24 & index < 49){index <- index - 24}
@@ -58,7 +59,7 @@ index
 ```
 \
 The LGEP files begin at 289 (because there are 288 technical EW replicates).  This is how meta data was extracted from these file names:
-```{r lgep.dat.ex}
+```
 each.file=289
  split.file.name <- strsplit(x=countfiles[each.file],split = "/")[[1]]
   split.file.name;
@@ -72,7 +73,7 @@ The above steps were written into a function for lapply
 \
 \
 EW Processing
-```{r exract.ew.dat}
+```
 ew.exp.dat <- lapply(1:288,function(each.file){
   split.file.name <- strsplit(x=countfiles[each.file],split = "/")[[1]]
   split.samp.name <- strsplit(split.file.name[6],split = "_")[[1]]
@@ -102,7 +103,7 @@ head(ew.exp.dat)
 ```
 \
 LGEP processing
-```{r extract.lgep.dat}
+```
 lgep.exp.dat <-  lapply(289:720,function(each.file){
   split.file.name <- strsplit(x=countfiles[each.file],split = "/")[[1]]
   
@@ -123,7 +124,7 @@ head(lgep.exp.dat)
 ```
 \
 Combine the two objects
-```{r combine.meta}
+```
 exp.dat.720 <- rbind(ew.exp.dat,lgep.exp.dat)
 str(exp.dat.720)
 rm(ew.exp.dat,lgep.exp.dat)
@@ -132,7 +133,7 @@ rm(ew.exp.dat,lgep.exp.dat)
 ## 3. Merge data with true index calls
 
 The below RData image contains the nucleotide index that was used for each technical rep.  It was created by sampling fastq files after filtering and trimming for barcodes which matched the true set. See <> script for details
-```{r load.correct.i}
+```
 load("./resources/exptdesign/index.RData")
 head(tech.rep.index)
 ```
@@ -146,7 +147,7 @@ tech.rep.file.name
 ```
 \
 We want to collect 5 & 6 from the countfiles .....
-```{r count.file.split}
+```
 count.file.split <- unlist(lapply(1:720,function(each.file){
   split.file.name <- strsplit(x=countfiles[each.file],split = "/")[[1]]
   split.file.name <- split.file.name[c(5,6)]
@@ -155,7 +156,7 @@ head(count.file.split)
 ```
 
 ...and collect 2 & 3 from the index data frame
-```{r index.file.split}
+```
 index.file.split <- unlist(lapply(1:720,function(each.file){
 split.file.name.i <- strsplit(x=as.character(tech.rep.index[each.file,2]),split = "/")[[1]]
   split.file.name.i <- split.file.name.i[c(2,3)]
@@ -165,7 +166,7 @@ head(index.file.split)
 \
 \
 Finally we can match the vectors and join:
-```{r match.code}
+```
 new.order <- match(count.file.split,index.file.split)
 identical(count.file.split,index.file.split[new.order]) 
 exp.dat.720$true.index <- tech.rep.index[new.order,1]
@@ -174,18 +175,13 @@ exp.dat.720$true.index <- tech.rep.index[new.order,1]
 ## 4. Load counts using tximport
 
 The tximport package can be used to import counts directly from salmon.  The return value is a large list object. See <> for details. 
-```{r load.counts}
+```
 library(tximport)
 salmon.counts <- tximport(files=countfiles,type = "salmon",txIn = T,countsFromAbundance = "no",txOut = T)
 ```
 
 ## 5. Save loaded counts and expt data:
-```{r save.files}
+```
 save(exp.dat.720,file="./analyses/step1/salmon_expt_data.RData",compress=T)
 save(salmon.counts,file="./analyses/step1/salmon_count_data.RData",compress=T)
-```
-
-
-```{r end, include=TRUE,echo=F}
-knitr::opts_knit$set(root.dir="/media/disk6/ARF/RNASEQ/")
 ```
