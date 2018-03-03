@@ -1,23 +1,20 @@
+# Step1: Load Raw counts + Phenos
 
-title: "Step1: Load Raw counts + Phenos"
 author: "Adam Festa"
 date: "March 2, 2018"
-output: 
-  html_document: 
-    toc: yes
 
 
 ## 1. Set working env and locate count file path
 
 Set WD to top level RNA seq analysis and read in the file path of quantfiles
 
-```{r countfilenames}
+```
 countfiles = list.files(path = "counts/86kSalmon/",pattern = "quant.sf",recursive = T,full.names = T)
 head(countfiles)
 ```
 \
 All count file names are "quant.sf", we can get the sample names from each respective file path:
-```{r show.count.file.names}
+```
 head(countfiles)
 tail(countfiles)
 ```
