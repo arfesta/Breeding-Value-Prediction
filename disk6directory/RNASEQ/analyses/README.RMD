@@ -1,0 +1,9 @@
+# ANALYSES
+
+## Step 1 - Data Prep
+
+    * The first step involves reading in the aligned technical replicate counts using the tximport package. Additionally the phenotype and other sample meta-data is constructed for normalization
+    
+## Step 2 - Normalization
+
+    * The counts may be normalized using the sommer package and account for lane, index, and pedigree if using the 576 techincal replicates, or, index and pedigree if using the 192 biological replicates.
