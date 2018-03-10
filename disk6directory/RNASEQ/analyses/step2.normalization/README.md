@@ -1,6 +1,20 @@
-# Normalizing read counts
+# Step 2: Normalization of raw read counts
 
-##Set WD to top level RNA seq analysis
+*A General Overview*: 
+
+The overall objective of this project is to explore alternative ways of predicting breeding values in new OP (or possibly FS) crosses that are going to be tested by the NCSU TIP.  It is important to remember that we are ultimately after a family-level effect while filtering and processing the data.
+
+In total, there are 576 techincal replicate samples.  These samples are composed of 144 biological replicates grown in "batch1" and 48 biological replicates grown in a separate "batch2".  The total 192 biological replicates correspond to 57 different families. (FS/OP/PMX all being unique)
+
+The purpose of normalizing counts is to remove *systematic variation* in sample read counts.  This variation can be due to fixed factors such as time of sample collection, index used, or sequecing machine used, causing bias in read counts.  For this data we have index and lane information that we will want to remove.
+
+Additionally, given the objective is to enhance the detection of shared expression patterns between families who have similar phenotypes, it would nice to leverage a covariance matrix describing the relationships among samples.  This type of covariance matrix, along with the other systematic variation, can be taken into consideration when using a mixed effect model.  Utilizing the R package  ```sommer``` we can model log2-transfomred count data to remove the effects of lane and index while attempting to estimate the random effect component for animal OR family id.
+
+Final point about estimating the "animal OR family id" random component, since utilizing a covariance matrix will infrom the model how many random components to estimate and return, we can average the additive relationshp matrix estimated from biological replicates returned from the pedigree to create a "family-level" relationship matrix based on expected allele frequency given population size (ex: 3 OP biological replicates in a population) and pedigree.
+
+## Now for the code:
+
+## Set WD to top level RNA seq analysis
 ```
 setwd("/media/disk6/ARF/RNASEQ/analyses")
 packages <- c("readr","sommer","dplyr","parallel","pedigree","reshape2","readxl","Metrics","caret")
