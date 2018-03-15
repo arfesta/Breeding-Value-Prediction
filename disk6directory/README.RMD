@@ -1,1 +1,37 @@
-# ALTERNATIVE APPROACHES -- File structure & scripts
+# TOC
+
+## analyses
+  
+  *Scripts for reading in aligned counts, normalization, and prediction
+
+## counts
+
+  *Placehodler directory for transcript count files returned from Salmon or other aligners 
+  
+## rawreads
+  
+  *Includes markdown for proccessing raw count data to salmon counts
+  
+  *Raw sequencing files returned from GSL
+  
+## references
+
+  *Transcriptome reference data needed for software
+  
+## resources
+
+  *Scripts for gathering experimental data, phenotypes, pedigree, index information
+  
+## snps
+  
+  *Includes markdown for proccessing snp data
+  
+  *SNP VCF files
+  
+## software
+
+  *Version of software used for data analysis
+  
+## trimmedfiltreads
+
+  *Read fastq files returned after filtering and trimming

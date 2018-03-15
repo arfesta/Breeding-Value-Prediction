@@ -1,0 +1,187 @@
+# Step1: Load Raw counts + Phenos
+
+author: "Adam Festa"
+date: "March 2, 2018"
+
+
+## 1. Set working env and locate count file path
+
+Set WD to top level RNA seq analysis and read in the file path of quantfiles
+
+```
+countfiles = list.files(path = "counts/86kSalmon/",pattern = "quant.sf",recursive = T,full.names = T)
+head(countfiles)
+```
+\
+All count file names are "quant.sf", we can get the sample names from each respective file path:
+```
+head(countfiles)
+tail(countfiles)
+```
+
+## 2. Extract meta-data from file path name
+
+Extract meta data from file path for all 720 technical replicates:####
+\
+\
+EXAMPLE : First a file name extract the lane by splitting each file name on "/" and selecting the 5th element, which corresponds to lane id.
+```
+each.file=1
+split.file.name <- strsplit(x=countfiles[each.file],split = "/")[[1]]
+split.file.name
+lane.name <- split.file.name[5]
+```
+\
+The 6th elelment of that vector contains the sample name.  We can split that sample to extract sample information
+
+```
+split.samp.name <- strsplit(split.file.name[6],split = "_")[[1]]
+samp.name <- split.samp.name[1]
+```
+
+  \
+  The 2nd element of the above vector contains the index ID
+  
+```
+index <- split.samp.name[2]
+```
+
+\
+Long story short: The index on sample file names is different between the two batches. A sepearate check was done on the raw fastq's to make sure that indicies were assigned correctly. This part can be ignored as its no longer used in normalization
+```
+  index <- as.numeric(gsub(pattern = "S",replacement = "",x = index))
+  if(index < 25){index <- index} 
+  if(index > 24 & index < 49){index <- index - 24}
+  if(index > 48 & index < 73){index <- index - 24*2}
+  if(index > 72) {index <- index - 24*3}
+  index <- LETTERS[index]
+index
+```
+\
+The LGEP files begin at 289 (because there are 288 technical EW replicates).  This is how meta data was extracted from these file names:
+```
+each.file=289
+ split.file.name <- strsplit(x=countfiles[each.file],split = "/")[[1]]
+  split.file.name;
+  lane.name <- split.file.name[5]
+  samp.name <- (gsub("([0-9]+).*$", "\\1", strsplit(split.file.name[6],split = "_")[[1]][2]))
+  index <- regmatches(split.file.name[6], regexpr("[^.](?=\\.)", split.file.name[6], perl = TRUE))
+ lane.name;samp.name;index
+```
+\
+The above steps were written into a function for lapply 
+\
+\
+EW Processing
+```
+ew.exp.dat <- lapply(1:288,function(each.file){
+  split.file.name <- strsplit(x=countfiles[each.file],split = "/")[[1]]
+  split.samp.name <- strsplit(split.file.name[6],split = "_")[[1]]
+  
+  lane.name <- split.file.name[5]
+  samp.name <- split.samp.name[1]
+  
+  
+  index <- split.samp.name[2]
+  index <- as.numeric(gsub(pattern = "S",replacement = "",x = index))
+  if(index < 25){index <- index} 
+  if(index > 24 & index < 49){index <- index - 24}
+  if(index > 48 & index < 73){index <- index - 24*2}
+  if(index > 72) {index <- index - 24*3}
+  index <- LETTERS[index]
+  
+  return(list("sample.name" = samp.name,
+              "lane.id" = lane.name,
+              "index.id" = index))
+})
+head(ew.exp.dat[[1]])
+ew.exp.dat <- data.frame(stringsAsFactors = F,
+      "animal.id" = as.numeric(sapply(ew.exp.dat,function(each.file) smp <- each.file$sample.name,simplify =T)) + 100,
+      "lane.id" = sapply(ew.exp.dat,function(each.file) smp <- each.file$lane.id,simplify =T),
+      "index.id" = sapply(ew.exp.dat,function(each.file) smp <- each.file$index.id,simplify =T))
+head(ew.exp.dat)
+```
+\
+LGEP processing
+```
+lgep.exp.dat <-  lapply(289:720,function(each.file){
+  split.file.name <- strsplit(x=countfiles[each.file],split = "/")[[1]]
+  
+  lane.name <- split.file.name[5]
+  samp.name <- (gsub("([0-9]+).*$", "\\1", strsplit(split.file.name[6],split = "_")[[1]][2]))
+  index <- regmatches(split.file.name[6], regexpr("[^.](?=\\.)", split.file.name[6], perl = TRUE))
+  
+  return(list("sample.name" = samp.name,
+              "lane.id" = lane.name,
+              "index.id" = index))
+})
+
+lgep.exp.dat <- data.frame(stringsAsFactors = F,
+                           "animal.id" = as.numeric(sapply(lgep.exp.dat,function(each.file) smp <- each.file$sample.name,simplify =T)) + 1000,
+                           "lane.id" = sapply(lgep.exp.dat,function(each.file) smp <- each.file$lane.id,simplify =T),
+                           "index.id" = sapply(lgep.exp.dat,function(each.file) smp <- each.file$index.id,simplify =T))
+head(lgep.exp.dat)
+```
+\
+Combine the two objects
+```
+exp.dat.720 <- rbind(ew.exp.dat,lgep.exp.dat)
+str(exp.dat.720)
+rm(ew.exp.dat,lgep.exp.dat)
+```
+
+## 3. Merge data with true index calls
+
+The below RData image contains the nucleotide index that was used for each technical rep.  It was created by sampling fastq files after filtering and trimming for barcodes which matched the true set. See <> script for details
+```
+load("./resources/exptdesign/index.RData")
+head(tech.rep.index)
+```
+\
+The second column of the above data frame corresponds to the sample name. We can split the file names in this column to match with split count file names:
+```{r split.check}
+count.rep.file.name <- strsplit(x=countfiles[1],split = "/")[[1]]
+tech.rep.file.name <- strsplit(x=as.character(tech.rep.index[,2])[1],split = "/")[[1]]
+count.rep.file.name
+tech.rep.file.name
+```
+\
+We want to collect 5 & 6 from the countfiles .....
+```
+count.file.split <- unlist(lapply(1:720,function(each.file){
+  split.file.name <- strsplit(x=countfiles[each.file],split = "/")[[1]]
+  split.file.name <- split.file.name[c(5,6)]
+  split.file.name <- paste(split.file.name[1],split.file.name[2],sep="_")}))
+head(count.file.split)
+```
+
+...and collect 2 & 3 from the index data frame
+```
+index.file.split <- unlist(lapply(1:720,function(each.file){
+split.file.name.i <- strsplit(x=as.character(tech.rep.index[each.file,2]),split = "/")[[1]]
+  split.file.name.i <- split.file.name.i[c(2,3)]
+  split.file.name.i <- paste(split.file.name.i[1],split.file.name.i[2],sep="_")}))
+head(index.file.split)
+```
+\
+\
+Finally we can match the vectors and join:
+```
+new.order <- match(count.file.split,index.file.split)
+identical(count.file.split,index.file.split[new.order]) 
+exp.dat.720$true.index <- tech.rep.index[new.order,1]
+```
+
+## 4. Load counts using tximport
+
+The tximport package can be used to import counts directly from salmon.  The return value is a large list object. See <> for details. 
+```
+library(tximport)
+salmon.counts <- tximport(files=countfiles,type = "salmon",txIn = T,countsFromAbundance = "no",txOut = T)
+```
+
+## 5. Save loaded counts and expt data:
+```
+save(exp.dat.720,file="./analyses/step1/salmon_expt_data.RData",compress=T)
+save(salmon.counts,file="./analyses/step1/salmon_count_data.RData",compress=T)
+```
