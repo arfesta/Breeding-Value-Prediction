@@ -1,8 +1,9 @@
 .RData
 86kSalmon/
-
 .fa
 .fasta
 Pita.86k/
 86k/
 .Rproj.user
+.httr-oauth
+.Rhistory
