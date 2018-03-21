@@ -71,3 +71,5 @@ expt.dat.192 <- within(expt.dat.192,expr = {
 dds <- DESeqDataSetFromMatrix(countData = og.txi$counts,colData = expt.dat.192,design = ~ 0 + ID)
 gc()
 dds.all <- DESeq(dds,parallel = T,fitType = "mean")
+
+save.image(file="/mnt/deseq2_norm.192.filt.mean.w.nooffset.RData")
