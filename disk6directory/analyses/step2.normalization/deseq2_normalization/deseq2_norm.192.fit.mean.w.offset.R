@@ -71,3 +71,5 @@ expt.dat.192 <- within(expt.dat.192,expr = {
 dds <- DESeqDataSetFromTximport(txi=og.txi,colData = expt.dat.192,design = ~ 0 + ID)
 gc()
 dds.all <- DESeq(dds,parallel = T,fitType = "mean")
+
+save.image(file = "/mnt/deseq.norm.192.fit.mean.w.offset.RData",compress=T)
