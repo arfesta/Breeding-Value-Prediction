@@ -23,5 +23,3 @@
      - This directory contains all original fasta and tar files separeated by EW/LGEP batch. Notes on how files were extracted are loacted at: ```Breeding-Value-Predictions/rawreads/86kSalmon```
 
 * Scripts and notes are stored here within this repo
-
-* Large pre-processed files such as raw and filtered/trimmed reads, or raw salmon count files, tare located on disk6/ARF
