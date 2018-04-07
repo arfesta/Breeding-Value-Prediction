@@ -18,9 +18,9 @@
 
 ## Location of raw read data
 
-* Raw countdata is located at files located at: ```/media/disk6/ARF/RNASEQ/data/rawreads/86kSalmon```
+* Raw count files returned from the GSL are located at: ```/media/disk6/ARF/RNASEQ/data/rawreads/86kSalmon```
      
-     - This contains all original fasta and tar files separeated by EW/LGEP batch.
+     - This directory contains all original fasta and tar files separeated by EW/LGEP batch. Notes on how files were extracted are loacted at: ```Breeding-Value-Predictions/rawreads/86kSalmon```
 
 * Scripts and notes are stored here within this repo
 
