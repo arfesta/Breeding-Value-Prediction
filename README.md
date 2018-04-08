@@ -30,12 +30,12 @@ Data | Path | Notes
 **trimmed and filtered read files** | `/media/disk6/ARF/RNASEQ/trimmedfiltreads/86k` | Files post trim & adapater removal
 *EW* | `./EW/lane01 ... ./lane12` | 
 *LGEP* | `./LGEP/lane01 ... ./lane18` | 
-**salmon count files** 
-*EW tech reps* | `/media/disk6/ARF/RNASEQ/counts/86kSalmon/EW/` | `./lane01 ... ./lane12`
-*LGEP tech reps* | `/media/disk6/ARF/RNASEQ/counts/86kSalmon/LGEP/` | `./lane01 ... ./lane18`
-*EW bio reps* | `/media/disk6/ARF/RNASEQ/counts/86kSalmon/bio_EW/` | `./Sample_<animal_id>/`
-*LGEP bio reps* | `/media/disk6/ARF/RNASEQ/counts/86kSalmon/bio_LGEP/` | `./Sample_<animal_id>/`
-**experimental data resources**  | `/media/disk6/ARF/RNASEQ/Breeding-Value-Prediction/disk6directory/resources`
+**salmon count files** | `/media/disk6/ARF/RNASEQ/counts/86kSalmon` | Direcotries containing quant.sf files
+*EW tech reps* | `./EW/lane01 ... ./lane12` | 
+*LGEP tech reps* | `./LGEP/lane01 ... ./lane18` |
+*EW bio reps* | `./bio_EW/Sample_<animal_id>/` | 
+*LGEP bio reps* | `./bio_LGEP/Sample_<animal_id>/` | 
+**experimental data resources**  | `/media/disk6/ARF/RNASEQ/Breeding-Value-Prediction/disk6directory/resources` | Experiment information
 *sequencing* | `./exptdesign/sequencing` | `./EWtarfiles or ./LGEPtarfiles`
 *pedigree* | `./pedigree` | `./EWfasta or ./LGEPfasta`
 *phenotypes* | `./phenos` | `./EWfasta or ./LGEPfasta`
