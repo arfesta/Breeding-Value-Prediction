@@ -4,20 +4,23 @@
 
 ## Abstract
 
-* Phenotypic variation in forest trees may be partitioned into genomic and environemntal compenets which are then used to estimate the heritability of traits of as the proportion of total phenotypic variation attributed to genetic variation.
+* Phenotypic variation in forest trees may be partitioned into genomic and environmntal compenets which are consequently used to estimate the heritability of traits as the proportion of total phenotypic variation attributed to genetic variation.
 
 * Applied tree breeding programs can use matrices of relationships, based either on recorded pedigrees in structured breeding populations or on genotypes of molecular genetic markers, to model genetic covariation among related individuals and predict genetic values for individuals for whom no phenotypic measurements are available. 
 
-* ***This study tests the hypothesis that genetic covariation among individuals of similar genetic value will be reflected in shared patterns of gene expression.*** We collected gene expression data by high-throughput sequencing of RNA isolated from pooled seedlings from parents of known genetic value, and compared alternative approaches to data analysis to test this hypothesis.
+* ***This study tests the hypothesis that genetic covariation among individuals of similar genetic value will be reflected in shared patterns of gene expression.*** We collected gene expression data by high-throughput sequencing of RNA isolated from pooled seedlings of parents with known genetic value, and compared alternative approaches to data analysis to test this hypothesis.
 
 ## Background of samples
 
 * LGEP
+   
+   - 144 Biological Replicates x 3 technical replicates = 432 technical replicates
 
 * EW
 
-## Location of data
+   - 80 Biological Replicates x 3 technical replicates = 240 technical replicates
 
+## Location of data
 
 Data | Path | Notes
 --- | --- | ---
@@ -27,3 +30,8 @@ Data | Path | Notes
 **trimmed and filtered read files** 
 *EW* | `/media/disk6/ARF/RNASEQ/trimmedfiltreads/86k/EW/` | `./lane01 ... ./lane12`
 *LGEP* | `/media/disk6/ARF/RNASEQ/trimmedfiltreads/86k/LGEP/` | `./lane01 ... ./lane18`
+**salmon count files** 
+*EW tech reps* | `/media/disk6/ARF/RNASEQ/counts/86kSalmon/EW/` | `./lane01 ... ./lane12`
+*LGEP tech reps* | `/media/disk6/ARF/RNASEQ/counts/86kSalmon/LGEP/` | `./lane01 ... ./lane18`
+*EW bio reps* | `/media/disk6/ARF/RNASEQ/counts/86kSalmon/bio_EW/` | `./Sample_<animal_id>/`
+*LGEP bio reps* | `/media/disk6/ARF/RNASEQ/counts/86kSalmon/bio_LGEP/` | `./Sample_<animal_id>/`
