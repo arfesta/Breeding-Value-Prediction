@@ -1,5 +1,5 @@
 FileName,WellId,Sample Description,From [bp],To [bp],Average Size [bp],Conc. [ng/l],Region Molarity [nmol/l],% of Total
-AF_nodil_11.5.15.D1000,A1,AF_nodil  1,150,900,368,22.1,96.7,93.19
+AF_nodil_11.5.15.D1000,A1,1,150,900,368,22.1,96.7,93.19
 AF_nodil_11.5.15.D1000,B1,2,150,900,370,13.5,58.8,91.04
 AF_nodil_11.5.15.D1000,C1,3,150,900,376,23.3,100,93.93
 AF_nodil_11.5.15.D1000,D1,4,150,900,368,14.3,62.8,90.75
