@@ -116,9 +116,9 @@ unique.fams <- unique(unlist(strsplit(x = unique.fams,split = "x")))
 unique.fams <- data.frame("ID"=unique.fams)
 # Accessed: tracker.cnr.ncsu.edu/tipdb/index.php
 # >> Pedigree Information >> Pedigrees & Relatives
-write_csv(unique.fams,col_names = T,path ="/media/disk6/ARF/RNASEQ/ufams.csv")
+write_csv(unique.fams,col_names = T,path ="/media/disk6/ARF/RNASEQ/Breeding-Value-Prediction/disk6directory/resources/phenos/ufams.csv")
 # Pedigree csv file was uploaded to tiproot and Ancestor info was downloaded:
-pedigree <- read_excel("/media/disk6/ARF/RNASEQ/pedigree_2018_04_07_21_08_39.xlsx")
+pedigree <- read_excel("/media/disk6/ARF/RNASEQ/Breeding-Value-Prediction/disk6directory/resources/pedigree/pedigree_2018_04_07_21_08_39.xlsx")
 
 unique.crosses <- unique(as.character(exp.dat$fam_id))
 unique.crosses <- grep("x", unique.crosses,value=TRUE)
@@ -126,14 +126,14 @@ unique.crosses <- strsplit(x = unique.crosses,split = "x")
 unique.crosses <- data.frame(do.call(rbind,unique.crosses))
 colnames(unique.crosses) <- c("parent1", "parent2")
 unique.crosses <- unique.crosses[-c(3,4,6),]
-write_delim(unique.crosses,col_names = T,append = F,delim = "\t",path ="/media/disk6/ARF/RNASEQ/ucrosses.csv")
+write_delim(unique.crosses,col_names = T,append = F,delim = "\t",path ="/media/disk6/ARF/RNASEQ/Breeding-Value-Prediction/disk6directory/resources/phenos/ucrosses.csv")
 # N22037	N22010 had to be manually reversed to be found in genetic_vals
 # UC values do not exsit; Same for:
 # N22029 B48:: B48 doesn't exist
 # N10010 B21 :: B21 doesn't exist
 # 
- breeding_values <- read_excel("/media/disk6/ARF/RNASEQ/breeding_values_2018_04_07_21_17_15.xlsx")
- genetic_values <- read_excel("/media/disk6/ARF/RNASEQ/genetic_values_2018_04_07_21_57_58.xlsx")
+ breeding_values <- read_excel("/media/disk6/ARF/RNASEQ/Breeding-Value-Prediction/disk6directory/resources/phenos/breeding_values_2018_04_07_21_17_15.xlsx")
+ genetic_values <- read_excel("/media/disk6/ARF/RNASEQ/Breeding-Value-Prediction/disk6directory/resources/phenos/genetic_values_2018_04_07_21_57_58.xlsx")
  
  phenotypes <- rbind(breeding_values[,-1],genetic_values[,-c(1,2)])
 par1 <- c(breeding_values$Parent1,genetic_values$Parent1)
@@ -159,6 +159,7 @@ out.name <-  paste0("Sample_",exp.dat$sample_id,"_",exp.dat$lane)
  true.lane <- gsub(pattern = "ew_",replacement = "",x = exp.dat$lane[1:288])
 exp.dat$salmon_output_path = paste0("media/disk6/ARF/RNASEQ/counts/86kSalmon/EW/", true.lane,"/",out.name)
 exp.dat$salmon_output_path[-c(1:288)] = paste0("media/disk6/ARF/RNASEQ/counts/86kSalmon/LGEP/", true.lane[-c(1:288)],"/",out.name[-c(1:288)])
-out.name <- paste0("Sample_",exp.dat$sample_id[each.file],"_",exp.dat$lane[each.file])
-  true.lane <- gsub(pattern = "ew_",replacement = "",x = exp.dat$lane[each.file])
+
 exp.dat.p <- exp.dat[-which(is.na(exp.dat$Volume)),]
+expt.dat.720 <- exp.dat
+save(expt.dat.720,file = "/media/disk6/ARF/RNASEQ/Breeding-Value-Prediction/disk6directory/resources/expt.dat.720.RData",compress=T)
