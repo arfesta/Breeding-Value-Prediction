@@ -1,0 +1,152 @@
+---
+title: "Identify RNA-SEQ Sample indicies"
+author: "Adam Festa"
+date: "April 8, 2018"
+output: html_document
+---
+
+## Background Summary
+
+To maximize the number of samples per lane in a cost effective manner, both the EW and LGEP RNASeq batches were sequenced using multiplexing with 24 index adapters provided by the GSL. Indicies were pre-assigned to biological replicates according to the experimental design; however due to the large number of samples and general inconsistencies noticed in SNP relationship matricies of the EW samples, there is a need to clairfy that the indicies assigned were actually used in sequencing. 
+
+The aim of this script is to identify the indicies which were used across all biological replicates so that index assignment, with respect to the experimental design, may be checked.  Additionally as a result of this script, any downstream normalization technique will use indicies which were identified from the actual fastq files instead of assumed by the sequencing experimental design.
+
+## Identify Index by Batch
+
+Filtered and trimmed fastq files which will be used to identify indicies are located at: `/media/disk6/ARF/RNASEQ/trimmedfiltreads/86k`
+
+After specifying the top-level directory there are two sub-directories which distinguish the batch `i.e. ./EW or ./LGEP`.  The distinction between the two batches is important in this instance because the grep statement used to pull header lines is different between the two batches. `EW="^@D00555"` & `LGEP="^@HISEQ"`
+
+The below chunk of code sets the working directory and then uses the first 25 reads from each of the technical replicates to produce a table which relays the sequence of adapters and number of times they were observed.
+
+```{r, set.wd}
+the.call <-  paste('cd /media/disk6/ARF/RNASEQ/trimmedfiltreads/86k/EW; rm all_indicies.txt; while read file; do gzip -cd $file |head -100 | grep "^@D00555" | cut -d : -f 10 | sort | uniq -c | sort -nr  >> all_indicies.txt; done < all.ew.reps',sep="")
+
+cat(the.call)
+```
+
+#### Explanation of command
+
+The command above first switches directories to the EW `cd EW` and removes any output from a previous run `rm all_indicies.txt`.  
+
+
+Then, while the input file is read `(while read file)` the input fastq.gz file is opened and passed to the head function which displays the first 100 lines `(do gzip -cd $file | head -100)`.  That output is passed to grep which grabs and passes on the header line (every 4th line in fastq file):`(grep "^@D00555")`. 
+
+
+The cut, sort, and unique functions are then used to cut the 10th field, which contains the index sequence, sort the vector by index name, gather the unique list of that vector index input, and then sort them by the number of times they occur `(cut -d : -f 10 | sort | uniq -c | sort -nr)`.  All of the ouput is then appended to a file named all_indicies ` >> all_indicies.txpt`.
+
+#### Execute command
+
+Using the base R system function we can run the above command and then read in the resulting ouput table
+
+```{r ex.command}
+system(the.call,ignore.stderr = T)
+
+ew.index.table <- read.table("/media/disk6/ARF/RNASEQ/trimmedfiltreads/86k/EW/all_indicies.txt")
+
+head(ew.index.table)
+```
+
+#### Making sense of output
+
+The output matrix can then be tabled by it's frequency of index occurance.  Since there are 12 lanes in the EW, we expect that an index which is used in all 12 lanes will show up 12 times.
+
+```{r show.out}
+ew.ind.table <- table(ew.index.table[,2])
+ew.ind.table[1:10]
+true.EW.index <- names(which(ew.ind.table == 12))
+head(true.EW.index)
+```
+
+
+## True Batch Index
+
+The previous section was a general way in which the observed indicies that were used within a batch may be identified.  This was done for the EW (shown above) and LGEP (output not shown):
+
+```{r, process.lgep}
+the.call <-  paste0('cd /media/disk6/ARF/RNASEQ/trimmedfiltreads/86k/LGEP; rm all_indicies.txt; while read file; do gzip -cd $file |head -200 | grep "^@HISEQ" | cut -d : -f 10 | sort | uniq -c | sort -nr  >> all_indicies.txt; done < all.lgep.reps')
+system(the.call,ignore.stderr = T)
+
+lgep.index.table <- read.table("/media/disk6/ARF/RNASEQ/trimmedfiltreads/86k/LGEP/all_indicies.txt")
+lgep.index.table <- table(lgep.index.table[,2])
+true.LGEP.index <- names(which(lgep.index.table == 18))
+```
+
+
+As before, the output of the LGEP and EW may be loaded to see if similar indicies were used across batches:
+
+```{r, tab.results}
+ew.index.table <- read.table("/media/disk6/ARF/RNASEQ/trimmedfiltreads/86k/EW/all_indicies.txt")
+ew.ind.table <- table(ew.index.table[,2])
+true.EW.index <- names(which(ew.ind.table == 12))
+
+lgep.index.table <- read.table("/media/disk6/ARF/RNASEQ/trimmedfiltreads/86k/LGEP/all_indicies.txt")
+lgep.ind.table <- table(lgep.index.table[,2])
+true.LGEP.index <- names(which(lgep.ind.table == 18))
+
+table(c(true.EW.index,true.LGEP.index))
+identical(true.EW.index,true.LGEP.index)
+```
+
+
+## Individual Biological Replicate Index
+
+Identical indicies were used
+
+```{r,ind.ew,error=T}
+# Load output from all EW
+all.ew.reps <- read.table("/media/disk6/ARF/RNASEQ/trimmedfiltreads/86k/EW/all.ew.reps")
+
+#We have the true barcodes for each batch now lets assign to samples
+
+ew.indicies <- vector() #Create empty vector to hold results
+
+#For each of the files in the list of file names in all.ew.reps, do the following:
+for(each.file in 1:nrow(all.ew.reps) ) {
+  file <- as.character(all.ew.reps$V1[each.file]) #subset the file under evaluation
+
+  #generate system call to subset first 2,5000 header lines and get index
+  the.call <- paste0('gzip -cd /media/disk6/ARF/RNASEQ/trimmedfiltreads/86k/EW/', file,' | head -10000 | grep "^@D00555" | cut -d : -f 10  > /media/disk6/ARF/RNASEQ/trimmedfiltreads/out.txt')
+  system(the.call)
+  
+  #read and table the ouptut file
+  index.count <- table(read.table(file = "/media/disk6/ARF/RNASEQ/trimmedfiltreads/out.txt")[,1])
+  
+  #identify which index in true.EW.index is in this list
+  index.name <- names(index.count)[which(names(index.count) %in% true.EW.index)]
+
+  #add that index from the bio rep to the the ew.indicies vector
+  ew.indicies <- c(ew.indicies,index.name)
+}
+
+head(ew.indicies) #contains 1 index per tech.rep file
+table(ew.indicies)
+```
+
+
+Same can be done for LGEP:
+```{r, lgep.test}
+all.lgep.reps <- read.table("/media/disk6/ARF/RNASEQ/trimmedfiltreads/86k/LGEP/all.lgep.reps")
+lgep.indicies <- vector()
+for(each.file in 1:nrow(all.lgep.reps) ) {
+  file <- as.character(all.lgep.reps$V1[each.file])
+  the.call <- paste0('gzip -cd /media/disk6/ARF/RNASEQ/trimmedfiltreads/86k/LGEP/', file,' | head -10000 | grep "^@HISEQ" | cut -d : -f 10 > /media/disk6/ARF/RNASEQ/trimmedfiltreads/out.txt')
+  system(the.call)
+  index.count <- table(read.table(file = "/media/disk6/ARF/RNASEQ/trimmedfiltreads/out.txt")[,1])
+index.name <- names(index.count)[which(names(index.count) %in% true.LGEP.index)]
+lgep.indicies <- c(lgep.indicies,index.name)
+}
+ 
+table(lgep.indicies)
+```
+
+
+
+## Save Output
+```{r,save}
+index=c(ew.indicies,lgep.indicies)
+file_name=c(as.character(all.ew.reps[,1]),as.character(all.lgep.reps[,1]))
+tech.rep.index <- cbind("index"=index,"file_name"=file_name)
+head(tech.rep.index)
+save(tech.rep.index,file = "/media/disk6/ARF/RNASEQ/Breeding-Value-Prediction/disk6directory/resources/exptdesign/sequencing/index.RData",compress=T)
+```
