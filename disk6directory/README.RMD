@@ -1,3 +1,7 @@
+# File structure of project
+
+All folders are located in the parent directory: `/media/disk6/ARF/RNASEQ/`
+
 Folder | Data Types
 --- | --- 
 **analyses**  | *Scripts for reading in aligned counts, normalization, and prediction*
