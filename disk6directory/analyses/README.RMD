@@ -1,24 +1,24 @@
 # ANALYSES
 
 ## Step 1 - Data Prep
-   
-      The data prep step includes everything from unpacking the tar files recieved by the GSL to estimating transcript               
-      abundance with Salmon
-   
-   See the [raw reads readme](../rawreads/README.md) for step by step processing of files.  
+
+   The data prep step includes everything from unpacking the tar files recieved by the GSL to estimating transcript               
+      abundance with Salmon. 
+      
+   See the [raw reads README](../rawreads/README.md) for step by step processing of files.  
 
 ## Step 2 - Load Count Data
       
-      Once counts have been estimated, the next step involves reading in the aligned technical, or biological replicate counts using the tximport package.
+   Once counts have been estimated, the next step involves reading in the aligned technical, or biological replicate counts using the tximport package.
       
-      Additionally, the phenotype and other sample meta-data is constructed for normalization
+   Additionally, the phenotype and other sample meta-data is constructed for normalization
 
 ## Step 3 - Normalization
 
-    * The counts may be normalized using the sommer package and account for lane, index, and pedigree if 
+   The counts may be normalized using the sommer package and account for lane, index, and pedigree if 
     
-      using the 576 techincal replicates. Output can be family or biological level log2 sample counts.
+   using the 576 techincal replicates. Output can be family or biological level log2 sample counts.
 
 ## Step 4 - Filtering
 
-     * Counts returned post-normalization are then applied to X different filters. ***
+   Counts returned post-normalization are then applied to X different filters.
