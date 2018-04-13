@@ -2,7 +2,7 @@
 
 ## Step 1 - Data Prep
    
-   [See markdown of data steps](disk6directory/rawreads/README.md)
+   [See markdown of data steps](../rawreads/README.md)
 
     * The first step involves reading in the aligned technical replicate counts using the tximport package.
       
