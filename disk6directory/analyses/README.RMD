@@ -2,8 +2,8 @@
 
 ## Step 1 - Data Prep
 
-   The data prep step includes everything from unpacking the tar files recieved by the GSL to estimating transcript               
-      abundance with Salmon. 
+   Data prep includes everything from unpacking the original tar files recieved by the GSL up to estimating transcript               
+      abundance with Salmon. Additionally, this step includes identification of the indicies used within both batches and creates an experimental info matrix containing all meta data from both batches.
       
    See the [raw reads README](../rawreads/README.md) for step by step processing of files.  
 
