@@ -1,28 +1,26 @@
--   [4/13/18 Creating counts from raw
-    reads](#creating-counts-from-raw-reads)
-    -   [1. Extract raw data](#extract-raw-data)
-        -   [Location of raw data](#location-of-raw-data)
-        -   [Extracting LGEP tar files](#extracting-lgep-tar-files)
-        -   [Extracting EW tar files](#extracting-ew-tar-files)
-        -   [Untar sequencing lanes](#untar-sequencing-lanes)
-    -   [2. Run fastqc on raw files](#run-fastqc-on-raw-files)
-    -   [3. Filter and trim raw reads](#filter-and-trim-raw-reads)
-    -   [4. FastQC can be re-done on filtered and trimmed
-        files](#fastqc-can-be-re-done-on-filtered-and-trimmed-files)
-    -   [5. Create complete experimental design
-        matrix](#create-complete-experimental-design-matrix)
-        -   [Check sample indicies](#check-sample-indicies)
-        -   [Integrate phenotypes, pedigree, and sequencing
-            data](#integrate-phenotypes-pedigree-and-sequencing-data)
-    -   [6. Align technical replicates with
-        Salmon](#align-technical-replicates-with-salmon)
-    -   [7. Align biological replicates with
-        Salmon](#align-biological-replicates-with-salmon)
-
-4/13/18 Creating counts from raw reads
+# 4/13/18 Creating counts from raw reads
 ======================================
 
-1. Extract raw data
+-   [1. Extract raw data](#extract-raw-data)
+     -   [Location of raw data](#location-of-raw-data)
+     -   [Extracting LGEP tar files](#extracting-lgep-tar-files)
+     -   [Extracting EW tar files](#extracting-ew-tar-files)
+     -   [Untar sequencing lanes](#untar-sequencing-lanes)
+-   [2. Run fastqc on raw files](#run-fastqc-on-raw-files)
+-   [3. Filter and trim raw reads](#filter-and-trim-raw-reads)
+-   [4. FastQC can be re-done on filtered and trimmed
+        files](#fastqc-can-be-re-done-on-filtered-and-trimmed-files)
+-   [5. Create complete experimental design
+        matrix](#create-complete-experimental-design-matrix)
+    -   [Check sample indicies](#check-sample-indicies)
+    -   [Integrate phenotypes, pedigree, and sequencing
+            data](#integrate-phenotypes-pedigree-and-sequencing-data)
+-   [6. Align technical replicates with
+        Salmon](#align-technical-replicates-with-salmon)
+-   [7. Align biological replicates with
+        Salmon](#align-biological-replicates-with-salmon)
+
+## Extract raw data
 -------------------
 
 ### Location of raw data
@@ -107,7 +105,7 @@ samples). The 12 tar files were delivered at two seperate times:
         ....
         ....
 
-2. Run fastqc on raw files
+## Run fastqc on raw files
 --------------------------
 
 -   Change into each of the 12 directories; create list of .fastq.gz
@@ -141,7 +139,7 @@ samples). The 12 tar files were delivered at two seperate times:
 
 **Noticed there is rRNA contamination in Sample 71 in EW lane 09.**
 
-3. Filter and trim raw reads
+## Filter and trim raw reads
 ----------------------------
 
 **rRNA contamination**
@@ -205,10 +203,10 @@ smaller, re-ran again on that file at a later time so file date is
 newer. Same with Sample\_57h in lane13 for LGEP, except issue was that
 fq.gz file was not complete.
 
-4. FastQC can be re-done on filtered and trimmed files
+## FastQC can be re-done on filtered and trimmed files
 ------------------------------------------------------
 
-5. Create complete experimental design matrix
+## Create complete experimental design matrix
 ---------------------------------------------
 
 ### Check sample indicies
@@ -219,7 +217,7 @@ Make link to: references/exptdesign/sequencing/
 
 Make link to: references/exptdesing/sequencing/
 
-6. Align technical replicates with Salmon
+## Align technical replicates with Salmon
 -----------------------------------------
 
 \*First index the 86k transcriptome:
@@ -285,7 +283,7 @@ LGEP.
         EW: /media/disk6/ARF/RNASEQ/counts/86kSalmon/EW/
         LGEP: /media/disk6/ARF/RNASEQ/counts/86kSalmon/LGEP/
 
-7. Align biological replicates with Salmon
+## Align biological replicates with Salmon
 ------------------------------------------
 
 Similar to how the technical replicates were aligned, the experimental
