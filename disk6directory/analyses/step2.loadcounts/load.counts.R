@@ -130,7 +130,7 @@ test.dat$an = as.factor(c(1,2,3,1,2,3))
 
 dds.txi.test <- DESeqDataSetFromTximport(test.txi,
                                    colData = test.dat,
-                                   design = ~ 0+ rep:an + rep)
+                                   design = ~  rep)
 
 
 library(BiocParallel)
@@ -139,5 +139,7 @@ keep <- rowSums(counts(dds.txi.test)) >= 10
 dds.txi.test <- dds.txi.test[keep,]
 dds.txi.test <- DESeq(object = dds.txi.test,minReplicatesForReplace = Inf,parallel = T)
 resultsNames(dds.txi.test)
-res <- results(dds.txi.test,name = "rep_N111095_LGEP_vs_N111095_EW",lfcThreshold = 1.2,pAdjustMethod = "bonferroni",alpha = .05)
+res <- results(dds.txi.test,name = "rep_N111095_LGEP_vs_N111095_EW",
+               lfcThreshold = 1.2,pAdjustMethod = "bonferroni",alpha = .05)
 summary(res)
+mcols(res$description)
