@@ -1,11 +1,7 @@
----
-title: "Step1: Load Raw counts + Phenos"
-author: "Adam Festa"
-date: "March 2, 2018"
-output: 
-  md_document: 
-    toc: yes
----
+
+# DE analysis (EW vs. LGEP)
+
+http://htmlpreview.github.io/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/tmp/common.ew.vs.lgep.html
 
 # Step1: Load Raw counts + Phenos
 
