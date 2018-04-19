@@ -1,7 +1,7 @@
 ---
 title: 'Alt Approaches Step 2: Load Raw Counts'
 author: "Adam Festa"
-date: "4/16/2018"
+date: "4/19/2018"
 output: html_document
 ---
 
@@ -11,7 +11,15 @@ knitr::opts_chunk$set(echo = TRUE,strip.white = F)
 
 ## Script objective
 
-This script takes the raw bioloigcal replicate count data produced by the first script (analyses/step1.data_prep/README.md) and preps objects for normalization techniques. Given that the objective of this project is to predict phenotypes, we will subset the counts and phenotype data to only include families where we have phenotypes available to use.
+This script preps the raw bioloigcal replicate count/experimental data for normalization by:
+  
+    * Removing low expressed counts 
+    
+    * Identifying potential outlier replicates
+    
+    * Combining counts with complete expermiental meta-data
+
+See: analyses/step1.data_prep/README.md for how input data to this script was generated. 
 
 ## Load data from previous run
 
@@ -21,7 +29,7 @@ This script takes the raw bioloigcal replicate count data produced by the first 
       load("/media/disk6/ARF/RNASEQ/counts/86kSalmon/bio_rep_txi_count_data_object.RData")
       names(txi)
     ```
-   
+    
     * The txi object is a list of 5 elements containing the counts, bootstrap variance estimates, and effect txpt lengths for each respective sample.
     
 * Load complete experimental meta data
@@ -33,15 +41,17 @@ This script takes the raw bioloigcal replicate count data produced by the first 
     
     * The experimental data set contain 720 rows and 36 columns.  Each row correspond to a technical replicate and each column corresponds to a piece of meta-deta describing the techincal replicate.
     
-    * Note that the experimental data needs to be consolidated to bioloigcal replicates in order to match the txi object.  This will be done next by identifying the column names and removing certain ones which uniquely describe the techincal replicates.
+    * Note that the experiment meta-data needs to be consolidated to bioloigcal replicates in order to match the txi object.  This will be done next by identifying the column names and removing certain ones which uniquely describe the techincal replicates.
 
-## Convert objects to bioloigcal replicates
+## Combine raw counts and experiment info
+
 * Print the column names of the experimental data frame.
+    
     ```{r meta.colnames, cache=F, eval=TRUE}
     colnames(expt.dat.720)
     ```
 
-      * Lot's of info in here.  The ones which are unique to technical replicates within a given biological replicate are:
+      * Lot's of stuff in here.  The ones which are unique to technical replicates within a given biological replicate are:
           * lane (col 6)
           * fl_mean (col 8)
           * salmple_id (col 10)
@@ -49,7 +59,8 @@ This script takes the raw bioloigcal replicate count data produced by the first 
           * salmon_output_path (col 36)
           
 
-* Remove the above columns and create bioloigcal replicate experimental data set
+* Remove the above columns and reduce the experiment info matrix to the level of bioloigcal replicates
+
     ```{r reduce.raw.pheno, cache=F }
     rm.cols <- c(6,8,10,11,36)
   
@@ -77,56 +88,35 @@ This script takes the raw bioloigcal replicate count data produced by the first 
     rownames(expt.dat.240) <- tmp.names
     ```
 
-## Subset families which have phenotypes
+## Pre-filter data and check for outliers
 
-Since this script will only utilize families which have phenotypes, let's identify those families and subset them from the data frames
-
-* Identify families which are missing phenotypic data for volume
-    ```{r subset.ew.lgep, cache=F }
-    missing.phenos <- which(is.na(expt.dat.240$Volume) == T)
-    table(as.character(expt.dat.240$fam_id)[missing.phenos])
-    ```
-      
-    * Note that family N051049 has a phenotype in tiproot version Piedmont 2014 V1, but does not have phenotype vaule for 2017 V1 Coastal. Should this be included?
-    
-* Subset these families from the phenotype matrix
-    ```{r subset.ew.lgep.pheno, cache=F }
-    sub.phenos <- droplevels.data.frame(expt.dat.240[-c(missing.phenos),])
-    ```
-
-* Subset these families from txi object
+* Filter out low expressed counts (total sum < 10) from txi object
     ```{r rm.low.cts, cache=F }
-    # Remove families with missing phenos from counts
-    txi$counts <- txi$counts[,-c(missing.phenos)]
-    
     # Filter out which transcripts have less than 10 total counts
     rm.zero <- which(apply(txi$counts,1,sum) < 10)
     txi$counts <- txi$counts[-c(rm.zero),]
     
-    # Remove low counts and remove fams with missing pheno from txi object
-    txi$abundance <- txi$abundance[-c(rm.zero),-c(missing.phenos)]
-    txi$length <- txi$length[-c(rm.zero),-c(missing.phenos)]
-    txi$variance <- txi$variance[-c(rm.zero),-c(missing.phenos)]
+    # Remove low counts from remaining objects in the list
+    txi$abundance <- txi$abundance[-c(rm.zero),]
+    txi$length <- txi$length[-c(rm.zero),]
+    txi$variance <- txi$variance[-c(rm.zero),]
     ```
 
-## Pre-filter data to remove outliers
 * Generate pc plot and check outliers
     ```{r check.out, cache=F }
     # Use the counts to create a pc plot and plot the first two
     mypc <- prcomp(t(txi$counts),center = T,scale. = T)
     mypc <- mypc$x[,1:2]
-    
-    plot(mypc[,1],mypc[,2]); abline(h=300,col="red")
+    plot(mypc[,1],mypc[,2]); abline(h=200,col="red")
     
     # Which reps are outliers?
-    sort(names(which(mypc[,2] > 300)))
+    sort(names(which(mypc[,2] > 200)))
     ```
 
 * Remove outlier biological replicates
     ```{r remove.bio.reps, cache=F }
     # Identify the rows which correspond to the outliers
-    rm.bio.reps <- which(mypc[,2] > 300)
-    
+    rm.bio.reps <- which(mypc[,2] > 200)
     # Subset the txi and pheno objects to remove families with less than 3 bio reps per batch
     txi$counts <- txi$counts[,-c(rm.bio.reps)]
     
@@ -136,7 +126,7 @@ Since this script will only utilize families which have phenotypes, let's identi
     txi$variance <- txi$variance[-c(rm.zero),-c(rm.bio.reps)]
     txi$length <- txi$length[-c(rm.zero),-c(rm.bio.reps)]
     
-    sub.phenos <- droplevels.data.frame(sub.phenos[-c(rm.bio.reps),])
+    sub.phenos <- droplevels.data.frame(expt.dat.240[-c(rm.bio.reps),])
     
     unique(sub.phenos$fam_id)
     ```
@@ -161,8 +151,8 @@ Since this script will only utilize families which have phenotypes, let's identi
     mypc <- prcomp(t(ew.cts),center = T,scale. = T)
     mypc <- mypc$x[,1:2]
     plot(mypc)
-    which(mypc[,2] > 200)
-    which(mypc[,1] >300)
+    sort(names(which(mypc[,2] < -100)))
+    which(mypc[,1] > 0 & mypc[,2] < -200)
     ```
       
       * Now look at LGEP:
