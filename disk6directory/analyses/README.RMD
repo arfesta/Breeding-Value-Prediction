@@ -11,7 +11,9 @@
       
    Once counts have been estimated, the next step involves reading in the aligned technical, or biological replicate counts using the tximport package.
       
-   Additionally, the phenotype and other sample meta-data is constructed for normalization
+   Additionally, the phenotype and other sample meta-data is constructed for normalization.
+   
+   See the [load counts html file](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step2.loadcounts/load.counts.html) for complete markdown with outputs.
 
 ## Step 3 - Normalization
 
