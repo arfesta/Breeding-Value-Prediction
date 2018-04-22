@@ -1,0 +1,156 @@
+---
+title: 'Alt Approaches Step 2: Load Raw Technical Replicate Counts'
+author: "Adam Festa"
+date: "April 21, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,strip.white = F)
+```
+
+## Script objective
+
+This script preps the raw technical replicate count/experimental data for normalization by:
+  
+    * Removing low expressed counts 
+    
+    * Identifying potential outlier replicates
+    
+    * Combining counts with complete expermiental meta-data
+
+See: analyses/step1.data_prep/README.md for how input data to this script was generated. 
+
+## Load data from previous run
+
+* Load the tximport object which contains biological replciates
+    ```{r raw.count, cache=F, echo=TRUE}
+      # tech counts
+      load("/media/disk6/ARF/RNASEQ/counts/86kSalmon/tech_rep_txi_count_data_object.RData")
+      names(txi)
+    ```
+    
+    * The txi object is a list of 5 elements containing the counts, bootstrap variance estimates, and effect txpt lengths for each respective sample.
+    
+* Load complete experimental meta data
+    ```{r raw.phenos, cache =F, echo=TRUE}
+      # expt data
+      load("/media/disk6/ARF/RNASEQ/Breeding-Value-Prediction/disk6directory/resources/expt.dat.720.RData")
+      dim(expt.dat.720)
+    ```
+    
+    * The experimental data set contain 720 rows and 36 columns.  Each row correspond to a technical replicate and each column corresponds to a piece of meta-deta describing the techincal replicate.
+    
+  
+## Connect raw counts and experiment info
+* Print the column names of the experimental data frame.
+    
+    ```{r meta.colnames, cache=F, eval=TRUE}
+    colnames(expt.dat.720)
+    ```
+
+* Print names of txi count data. To match them up we will need to paste together the animal id, lane, and index letter from the experiment info data frame.
+
+    ```{r check.order.count.pheno, cache=F }
+    # print the column names of the counts (biological replicate names)
+    head(colnames(txi$counts))
+    # Create a vector of names to match with the counts
+      pheno.colnames <- paste(expt.dat.720$animal_id,expt.dat.720$lane,expt.dat.720$index_let,sep = ".")
+    # Check for identical names between phenos and counts   
+      identical(pheno.colnames,colnames(txi$counts))
+    ```
+    
+
+## Pre-filter data and check for outliers
+
+* Filter out low expressed counts (total sum < 10) from txi object
+    ```{r rm.low.cts, cache=F }
+    # Filter out which transcripts have less than 10 total counts
+    rm.zero <- which(apply(txi$counts,1,sum) < 576)
+    txi$counts <- txi$counts[-c(rm.zero),]
+    
+    # Remove low counts from remaining objects in the list
+    txi$abundance <- txi$abundance[-c(rm.zero),]
+    txi$length <- txi$length[-c(rm.zero),]
+    txi$variance <- txi$variance[-c(rm.zero),]
+    ```
+
+* Generate pc plot and check outliers
+    ```{r check.out, cache=F }
+    # Use the counts to create a pc plot and plot the first two
+    mypc <- prcomp(t(txi$counts),center = T,scale. = T)
+    mypc <- mypc$x[,1:2]
+    plot(mypc[,1],mypc[,2]); abline(h=175,col="red")
+    
+    # Which reps are outliers?
+    data.frame("bad.samps" = sort(names(which(mypc[,2] > 175))))
+    ```
+
+* Remove outlier biological replicates
+    ```{r remove.bio.reps, cache=F }
+    # Identify the rows which correspond to the outliers
+    rm.tech.reps <- which(mypc[,2] > 175)
+    # Subset the txi and pheno objects to remove families with less than 3 bio reps per batch
+    txi$counts <- txi$counts[,-c(rm.tech.reps)]
+    
+    rm.zero <- which(apply(txi$counts,1,sum) < ncol(txi$counts))
+    txi$counts <- txi$counts[-c(rm.zero),]
+    txi$abundance <- txi$abundance[-c(rm.zero),-c(rm.tech.reps)]
+    txi$variance <- txi$variance[-c(rm.zero),-c(rm.tech.reps)]
+    txi$length <- txi$length[-c(rm.zero),-c(rm.tech.reps)]
+    
+    sub.phenos <- droplevels.data.frame(expt.dat.720[-c(rm.tech.reps),])
+    
+    unique(sub.phenos$fam_id)
+    ```
+
+
+* Generate pc plot and check outliers
+    ```{r check.out.v2, cache=F }
+    # Use the counts to create a pc plot and plot the first two
+    mypc <- prcomp(t(txi$counts),center = T,scale. = T)
+    mypc <- mypc$x[,1:2]
+    plot(mypc)
+    ```
+    
+    * The EW and LGEP are parallel to one another on the plot above.  How would the samples look if we created a PC plot using only the LGEP or EW?
+    
+    ```{r check.out.ew, cache=F}
+    ew.reps <- which(sub.phenos$batch == "EW")
+    ew.cts <- txi$counts[,ew.reps]
+    rm.zero <- which(apply(ew.cts,1,sum) <= ncol(ew.cts))
+    ew.cts <- ew.cts[-c(rm.zero),]
+    
+    mypc <- prcomp(t(ew.cts),center = T,scale. = T)
+    mypc <- mypc$x[,1:2]
+    plot(mypc)
+    sort(names(which(mypc[,1] < -250)))
+    sort(names(which(mypc[,1] < -100 & mypc[,2] > 50)))
+    ```
+      
+      * Now look at LGEP:
+    
+    ```{r checkout.lgep, cache=F}
+    lgep.reps <- which(sub.phenos$batch == "LGEP")
+    lgep.cts <- txi$counts[,lgep.reps]
+    rm.zero <- which(apply(lgep.cts,1,sum) <= ncol(lgep.cts))
+    lgep.cts <- lgep.cts[-c(rm.zero),]
+    
+    mypc <- prcomp(t(lgep.cts),center = T,scale. = T)
+    mypc <- mypc$x[,1:2]
+    plot(mypc)
+    sort(names(which(mypc[,1] < -225)))
+    ```
+
+
+* Probably should keep an eye on the above samples, but prior to normalization there is nothing to suggest that these samples are "bad"
+
+## Save output
+* Now let's save the objects which will be used for normalization
+    ```{r save.objects}
+    load.counts_tech <- vector("list")
+    load.counts_tech$txi_object <- txi
+    load.counts_tech$phenos <- sub.phenos
+    
+    save(load.counts_tech,file="/media/disk6/ARF/RNASEQ/counts/86kSalmon/Step2_TECH_Load_Counts.RData",compress=T)
+    ```
