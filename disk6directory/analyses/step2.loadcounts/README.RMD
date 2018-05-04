@@ -1,3 +1,5 @@
 # Loading Raw Counts
 
-See: [load.counts.html](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step2.loadcounts/load.counts.html) for complete markdown with outputs
+For biological replicates see: [bio rep load.counts.html](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step2.loadcounts/load.counts.html) for complete markdown with outputs
+
+For technical replicates see: [tech repload.counts.html](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step2.loadcounts/load.counts_techreps.html) for complete markdown with outputs
