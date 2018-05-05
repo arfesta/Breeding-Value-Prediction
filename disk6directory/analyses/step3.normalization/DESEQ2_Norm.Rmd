@@ -1,0 +1,48 @@
+---
+title: "DESeq2 Normalization"
+author: "Adam Festa"
+date: "May 4, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load the txi counts and phenos
+
+* The biological replicate counts and phenotype data were previously prepared for normalization. For more details on the preparation, see Step 2 readme.
+
+```{r load.data}
+load("/media/disk6/ARF/RNASEQ/counts/86kSalmon/Step2_Load_Counts.RData")
+names(load.counts)
+```
+
+## Create DESeq object
+
+* The object loaded above the txi_object imported using the tximport package and phenotypes.  The [DESeq2 vignette](https://bioconductor.org/packages/3.7/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#transcript-abundance-files-and-tximport-input) describes how to create a dds object using the txi_object.
+
+```{r create.dds, echo=TRUE}
+suppressPackageStartupMessages(library(DESeq2))
+
+ddsTxi <- DESeqDataSetFromTximport(load.counts$txi_object,
+                                   colData = load.counts$phenos,
+                                   design = ~ batch + index_seq + fam_id)
+```
+
+## Estimate size factors
+
+* Normalization within DESeq occurs by implementing the function `estimateSizeFactors()`. Once that function finishes we can extract the DESeq2 version of normalized counts.[source link](https://support.bioconductor.org/p/66067/)
+
+```{r normalize}
+ddsTxi <- estimateSizeFactors(ddsTxi)
+```
+
+## Extract normalized counts, combine with phenos, and save
+```{r}
+deseq.counts <- counts(ddsTxi,normalized=T)
+mypc <- prcomp(t(deseq.counts),scale. = T,center = T)
+mypc <- mypc$x
+plot(mypc[,1:2])
+save(asreml.counts,file = "../Step3_DESEQ_Counts.RData",compress=T)
+```
