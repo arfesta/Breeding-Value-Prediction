@@ -3,6 +3,8 @@ title: "DESeq2 Normalization"
 author: "Adam Festa"
 date: "May 4, 2018"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -14,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 * The biological replicate counts and phenotype data were previously prepared for normalization. For more details on the preparation, see Step 2 readme.
 
 ```{r load.data}
-load("/media/disk6/ARF/RNASEQ/counts/86kSalmon/Step2_Load_Counts.RData")
+load("/mnt/media/disk6/ARF/RNASEQ/counts/86kSalmon/Step2_Load_Counts.RData")
 names(load.counts)
 ```
 
@@ -44,5 +46,6 @@ deseq.counts <- counts(ddsTxi,normalized=T)
 mypc <- prcomp(t(deseq.counts),scale. = T,center = T)
 mypc <- mypc$x
 plot(mypc[,1:2])
-save(asreml.counts,file = "../Step3_DESEQ_Counts.RData",compress=T)
+
+save(deseq.counts,file = "/mnt/media/disk6/ARF/RNASEQ/counts/86kSalmon/Step3_DESEQ_Counts.RData",compress=T)
 ```
