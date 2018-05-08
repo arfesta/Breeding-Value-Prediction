@@ -81,7 +81,7 @@ plot(the.predictions,true.val)
 mean.cts <- apply(asreml.counts,2,mean)
 sd.cts <- apply(asreml.counts,2,sd)
 bcv.cts <- sd.cts/mean.cts
-cor.mat <- cor(t(log2(asreml.counts[,which(bcv.cts > 1.1)] + 1)))
+cor.mat <- cor(t(log2(asreml.counts[,which(bcv.cts > 1)] + 1)))
 
 the.predictions <- sapply(1:57,function(each.fam){
   test.fam <- rownames(fam.phenos)[each.fam]
@@ -97,16 +97,23 @@ plot(the.predictions,true.val)
 
 ```{r}
 
-the.predictions <- sapply(1:57,function(each.fam){
+p.vals <- mclapply(1:57,function(each.fam){
   test.fam <- each.fam
   train.fam <- c(1:57)[-each.fam]
   train.phenos <- fam.phenos$Volume[train.fam]
-  pvals <- sapply(1:ncol(asreml.counts),function(x){
+  sapply(1:ncol(asreml.counts),function(x){
     if(var(asreml.counts[train.fam,x]) > 0.001){
- summary(lm(fam.phenos$Volume[train.fam] ~ asreml.counts[train.fam,x]))[[4]][[8]] } else { NA}
+      summary(lm(fam.phenos$Volume[train.fam] ~ asreml.counts[train.fam,x]))[[4]][[8]] } else { NA }
     })
- keep <- which(pvals < .05)
-cor.mat <- cor(t(log2(asreml.counts[,keep] + 1)))
+},mc.cores=30)
+```
+
+```{r}
+the.predictions <- sapply(1:57,function(each.fam){  
+  adjusted.p <- p.adjust(p = p.vals[[each.fam]],method = "fdr")
+ #keep <- which(p.vals[[each.fam]] < .05)
+  keep <- which(adjusted.p[[each.fam]] < .1)
+  cor.mat <- cor(t(log2(asreml.counts[,keep] + 1)))
 
   test.fam <- rownames(fam.phenos)[each.fam]
   train.fam <- rownames(fam.phenos)[-each.fam]
@@ -117,3 +124,31 @@ cor(the.predictions,true.val)^2
 plot(the.predictions,true.val)
 ```
 
+#### GLMNET
+
+```{r}
+suppressPackageStartupMessages(library(glmnet))
+
+the.predictions <- sapply(1:57,function(each.fam){  
+  test.fam <- rownames(fam.phenos)[each.fam]
+  train.fam <- rownames(fam.phenos)[-each.fam]
+ #keep <- which(p.vals[[each.fam]] < .05)
+  mean.cts <- apply(asreml.counts,2,mean)
+sd.cts <- apply(asreml.counts,2,sd)
+bcv.cts <- sd.cts/mean.cts
+  keep <- which(bcv.cts > 1)
+ gl.mod <- glmnet(x = log2(asreml.counts[-each.fam,keep]),
+                  y = fam.phenos$Volume[-each.fam],alpha = .5) 
+ out <- gl.mod$beta
+ select <- which(out[,ncol(out)] > 0)
+
+ cor.mat <- cor(t(log2(asreml.counts[,keep[select]] + 1)))
+
+  test.fam <- rownames(fam.phenos)[each.fam]
+  train.fam <- rownames(fam.phenos)[-each.fam]
+  okriging(idtest = test.fam,idtrain = train.fam,corlist = list(cor.mat),H2vec = c(.99),pheno = fam.phenos,phenoname = "Volume")[,2] - mean(fam.phenos$Volume[-each.fam])
+})
+
+cor(the.predictions,true.val)^2
+plot(the.predictions,true.val)
+```
