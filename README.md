@@ -34,18 +34,18 @@
 
 Data Subject Type | Data File Type | Path | Notes
 --- | --- | --- | ---
-**raw read files**  | | `/media/disk6/ARF/RNASEQ/rawreads/86kSalmon` | Raw files returned from GSL
+**raw read files**  | | `/media/disk6/ARF/RNASEQ/shared/rawreads/86kSalmon` | Raw files returned from GSL
 | | *raw tar* | `./EWtarfiles or ./LGEPtarfiles`
 | | *raw fasta* | `./EWfasta or ./LGEPfasta` 
-**trimmed and filtered read files** | |`/media/disk6/ARF/RNASEQ/trimmedfiltreads/86k` | Files post trim & adapater removal
+**trimmed and filtered read files** | |`/media/disk6/ARF/RNASEQ/shared/trimmedfiltreads/86k` | Files post trim & adapater removal
 |  |*EW* | `./EW/lane01 ... ./lane12` | 
 |  |*LGEP* | `./LGEP/lane01 ... ./lane18` | 
-**salmon count files** | |`/media/disk6/ARF/RNASEQ/counts/86kSalmon` | Direcotries containing quant.sf files
+**salmon count files** | |`/media/disk6/ARF/RNASEQ/shared/counts/86kSalmon` | Direcotries containing quant.sf files
 |  |*EW tech reps* | `./EW/lane01 ... ./lane12` | 
 |  |*LGEP tech reps* | `./LGEP/lane01 ... ./lane18` |
 |  |*EW bio reps* | `./bio_EW/Sample_<animal_id>/` | 
 |  |*LGEP bio reps* | `./bio_LGEP/Sample_<animal_id>/` | 
-**experimental data resources**  | | `/media/disk6/ARF/RNASEQ/Breeding-Value-Prediction/disk6directory/resources` | Experiment information
+**experimental data resources**  | | `/media/disk6/ARF/RNASEQ/BV-Prediction/Breeding-Value-Prediction/disk6directory/resources` | Experiment information
 |  |*sequencing* | `./exptdesign/sequencing` | `./EWtarfiles or ./LGEPtarfiles`
 |  |*pedigree* | `./pedigree` | `./EWfasta or ./LGEPfasta`
 |  |*phenotypes* | `./phenos` | `./EWfasta or ./LGEPfasta`
