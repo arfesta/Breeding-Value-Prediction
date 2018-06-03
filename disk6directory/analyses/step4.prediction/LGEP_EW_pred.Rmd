@@ -1,0 +1,626 @@
+---
+title: "Prediction of EW Volume BV's using LGEP"
+author: "Adam Festa"
+date: "5/27/2018"
+output: 
+  html_document: 
+    number_sections: yes
+    theme: flatly
+    toc: yes
+    toc_depth: 5
+editor_options: 
+  chunk_output_type: console
+---
+
+## Script objective
+
+* Predict volume of EW using LGEP
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load data
+
+```{r load.data}
+# Load counts
+load("/mnt/mnt/media/disk6/ARF/RNASEQ/counts/86kSalmon/Step3_LMM_animal.RData")
+head(rownames(asreml.counts))
+asreml.counts <- asreml.counts[-c(1:94),]
+head(rownames(asreml.counts))
+
+# Load phenos
+load("/mnt/mnt/media/disk6/ARF/RNASEQ/Breeding-Value-Prediction/disk6directory/resources/expt.dat.720.RData")
+# Change factor to character and subset 3 columns
+expt.dat.720$fam_id <- as.character(expt.dat.720$fam_id)
+select.columns <- c("fam_id","animal_id","Volume","Volume Accuracy","Height","index_seq","batch")
+
+# Remove missing phenotypes and subset for phenos which have counts
+fam.phenos <- unique(expt.dat.720[-which(is.na(expt.dat.720$Volume) == T),select.columns])
+
+# Edit rownames of asreml.counts
+ sub.names <- gsub(pattern = "animal_id, var = T)_",replacement = "",x = rownames(asreml.counts))
+ sub.names <- gsub("ped\\(", "", sub.names)
+    
+# Subset each count data to contain only rows which have phenos
+select.rows <- which(sub.names %in% as.character(fam.phenos$animal_id))
+
+asreml.counts <- asreml.counts[select.rows,]
+
+select.rows <- which(as.character(fam.phenos$animal_id) %in% sub.names)
+fam.phenos <- fam.phenos[select.rows,]
+```
+
+```{r check.order}
+final.r.names <- gsub(pattern = "animal_id, var = T)_",replacement = "",x = rownames(asreml.counts))
+final.r.names <- gsub("ped\\(", "", final.r.names)
+head(as.character(fam.phenos$animal_id))
+head(final.r.names)
+
+rownames(asreml.counts) <- paste0(final.r.names,".",fam.phenos$index_seq)
+rownames(fam.phenos) <- paste0(fam.phenos$animal_id,".",fam.phenos$index_seq)
+```
+
+## Summary stats
+
+```{r summary.counts}
+sum.of.counts.per.gene <- apply(asreml.counts,2,sum)
+sum.of.counts.per.fam <- apply(asreml.counts,1,sum)
+hist(sum.of.counts.per.fam)
+```
+
+## Generate family-level info
+
+* Create family level phenotypes
+
+```{r fam.phenos}
+# First subset the unique fam, volume, batch combo to see what fams are in both batches
+pheno.57 <- unique(fam.phenos[,c("fam_id","Volume","batch")])
+
+# Identify which families were grown in both batches
+crossover.fams <- names(which(table(pheno.57$fam_id) ==2))
+crossover.fams
+
+# Now get the unique list of family phenos
+pheno.57 <- unique(fam.phenos[,c("fam_id","Volume","Volume Accuracy")])
+```
+
+* Create family mean counts
+
+```{r fam.mean}
+fam.asreml.counts <- matrix(,nrow = 57,ncol=ncol(asreml.counts))
+all.fams <- unique(as.character(fam.phenos$fam_id))
+for(each.fam in 1:57){
+ merge.bio.reps <-  which(fam.phenos$fam_id %in% all.fams[each.fam])
+ if(length(merge.bio.reps) == 1){ fam.asreml.counts[each.fam,] <- asreml.counts[merge.bio.reps,]} else {
+   fam.asreml.counts[each.fam,] <- apply(asreml.counts[merge.bio.reps,],2,mean)}
+}
+rownames(fam.asreml.counts) <- all.fams
+
+rownames(pheno.57) <- pheno.57$fam_id
+```
+
+## Predictions
+
+* Establish the training and testing
+
+```{r setup.pred}
+# Split test and train set by batch
+ew.fams <- unique(fam.phenos$fam_id[which(fam.phenos$batch == "EW")])
+lgep.fams <- unique(fam.phenos$fam_id[which(fam.phenos$batch == "LGEP")])
+
+# Remove crossover fams from test set
+ew.fams <- ew.fams[-which(ew.fams %in% crossover.fams)]
+```
+
+### Omic Kriging
+
+```{r load.pred.packages}
+suppressPackageStartupMessages(library(OmicKriging))
+suppressPackageStartupMessages(library(Metrics))
+```
+
+#### All transcripts: BIO Reps
+
+* Bio-reps: NO SCALING
+```{r alltxpts.bio}
+cor.mat <- cor(t(scale(log2(asreml.counts + 1),center=F,scale = F)))
+rownames(cor.mat) <- 1:190; colnames(cor.mat) <- 1:190
+rownames(fam.phenos) <- 1:190
+
+TRAIN.fams <- which(fam.phenos$fam_id %in% lgep.fams)
+TEST.fams <- which(fam.phenos$fam_id %in% ew.fams)
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = fam.phenos,phenoname = "Volume")
+
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+
+* Bio-reps: SCALED, NO CENTERING
+```{r alltxpts.bio2}
+cor.mat <- cor(t(scale(log2(asreml.counts + 1),center=F,scale = T)))
+rownames(cor.mat) <- 1:190; colnames(cor.mat) <- 1:190
+rownames(fam.phenos) <- 1:190
+
+TRAIN.fams <- which(fam.phenos$fam_id %in% lgep.fams)
+TEST.fams <- which(fam.phenos$fam_id %in% ew.fams)
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = fam.phenos,phenoname = "Volume")
+
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+
+* Bio-reps: SCALED & CENTERED
+```{r alltxpts.bio3}
+cor.mat <- cor(t(scale(log2(asreml.counts + 1),center=T,scale = T)))
+rownames(cor.mat) <- 1:190; colnames(cor.mat) <- 1:190
+rownames(fam.phenos) <- 1:190
+
+TRAIN.fams <- which(fam.phenos$fam_id %in% lgep.fams)
+TEST.fams <- which(fam.phenos$fam_id %in% ew.fams)
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = fam.phenos,phenoname = "Volume")
+
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+
+*** The BEST result from Bio replicates is using log2 with NO SCALING/CENTERING
+
+#### All transcripts: FAMILY-level
+
+* Fam reps: NO SCALING/CENTERING
+
+```{r alltxpts.fam}
+cor.mat <- cor(t(scale(log2(fam.asreml.counts + 1),center=F,scale = F)))
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = pheno.57,phenoname = "Volume")
+
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+
+* Fam reps: SCALED, NO CENTERING
+
+```{r alltxpts.fam2}
+cor.mat <- cor(t(scale(log2(fam.asreml.counts + 1),center=F,scale = T)))
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = pheno.57,phenoname = "Volume")
+
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+* Fam reps: SCALED & CENTERED
+
+```{r alltxpts.fam3}
+cor.mat <- cor(t(scale(log2(fam.asreml.counts + 1),center=T,scale = T)))
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = pheno.57,phenoname = "Volume")
+
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+
+*** The BEST results are either from SCALING/NO_CENTERING or NO SCALING/CENTERING.
+
+### BCV transcripts: FAMILY-level
+
+* BCV > 1 NO SCALE/CENTER
+```{r bcvtxpts.fam}
+mean.cts <- apply(fam.asreml.counts,2,mean)
+sd.cts <- apply(fam.asreml.counts,2,sd)
+bcv.cts <- sd.cts/mean.cts
+cor.mat <- cor(t(log2(fam.asreml.counts[,which(bcv.cts > 1)] + 1)))
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = pheno.57,phenoname = "Volume")
+
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+
+* BCV > 1 SCALED, NO CENTERING
+```{r bcvtxpts.fam2}
+cor.mat <- cor(t(scale(log2(fam.asreml.counts[,which(bcv.cts > 1)] + 1),center=F,scale = T)))
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = pheno.57,phenoname = "Volume")
+
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+* BCV > 1 SCALED & CENTERED
+```{r bcvtxpts.fam3}
+cor.mat <- cor(t(scale(log2(fam.asreml.counts[,which(bcv.cts > 1)] + 1),center=T,scale = T)))
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = pheno.57,phenoname = "Volume")
+
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+*** The BEST result using BCV is done with NO CENTERING/SCALING
+
+### Linear model regression
+
+* Conduct a linear regression from the LGEP against Volume and use sig txpts to predict EW
+
+```{r lm.pval}
+# identify rows which correspond to LGEP
+
+train.counts <- asreml.counts[which(fam.phenos$fam_id %in% lgep.fams),]
+train.phenos <- fam.phenos[which(fam.phenos$fam_id %in% lgep.fams),]
+
+pvals <- mclapply(1:ncol(train.counts),function(each.txpt){
+  txpt <- train.counts[,each.txpt]
+  summary(lm(train.phenos$Volume ~ txpt))[[4]][[8]]
+})
+pvals <- unlist(pvals)
+hist(pvals)
+```
+
+##### Use straight p-vals
+
+* Try subsetting on p-value with NO fdr adjustment: 0.05, 0.01, 0.001, 0.0001
+
+```{r pred.pval}
+p.val.subset <- .05
+cor.mat <- cor(t(scale(log2(fam.asreml.counts[,which(pvals <= p.val.subset)] + 1),center=F,scale = T)))
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = pheno.57,phenoname = "Volume")
+#predictions[,2:3] <- predictions[,2:3] - mean(pheno.57$Volume[which(pheno.57$fam_id %in% lgep.fams)])
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+
+# Subset test families from pheno data to see volume accuracy
+test.phenos <- pheno.57[which(as.character(predictions$IID) %in% pheno.57$fam_id),]
+low.acc.fams <- test.phenos$fam_id[which(test.phenos$`Volume Accuracy` < .9)]
+high.acc.pred <- predictions[-which(as.character(predictions$IID) %in% low.acc.fams ),]
+
+cor(high.acc.pred$Ypred,high.acc.pred$Ytest)
+plot(high.acc.pred$Ypred,high.acc.pred$Ytest)
+```
+
+```{r pred.pval2}
+p.val.subset <- .01
+cor.mat <- cor(t(scale(log2(fam.asreml.counts[,which(pvals <= p.val.subset)] + 1),center=F,scale = T)))
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = pheno.57,phenoname = "Volume")
+#predictions[,2:3] <- predictions[,2:3] - mean(pheno.57$Volume[which(pheno.57$fam_id %in% lgep.fams)])
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+
+# Subset test families from pheno data to see volume accuracy
+test.phenos <- pheno.57[which(as.character(predictions$IID) %in% pheno.57$fam_id),]
+low.acc.fams <- test.phenos$fam_id[which(test.phenos$`Volume Accuracy` < .9)]
+high.acc.pred <- predictions[-which(as.character(predictions$IID) %in% low.acc.fams ),]
+
+cor(high.acc.pred$Ypred,high.acc.pred$Ytest)
+plot(high.acc.pred$Ypred,high.acc.pred$Ytest)
+```
+
+```{r pred.pval3}
+p.val.subset <- .001
+cor.mat <- cor(t(scale(log2(fam.asreml.counts[,which(pvals <= p.val.subset)] + 1),center=F,scale = T)))
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = pheno.57,phenoname = "Volume")
+#predictions[,2:3] <- predictions[,2:3] - mean(pheno.57$Volume[which(pheno.57$fam_id %in% lgep.fams)])
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+
+# Subset test families from pheno data to see volume accuracy
+test.phenos <- pheno.57[which(as.character(predictions$IID) %in% pheno.57$fam_id),]
+low.acc.fams <- test.phenos$fam_id[which(test.phenos$`Volume Accuracy` < .9)]
+high.acc.pred <- predictions[-which(as.character(predictions$IID) %in% low.acc.fams ),]
+
+cor(high.acc.pred$Ypred,high.acc.pred$Ytest)
+plot(high.acc.pred$Ypred,high.acc.pred$Ytest)
+```
+
+```{r pred.pval4}
+p.val.subset <- .0001
+cor.mat <- cor(t(scale(log2(fam.asreml.counts[,which(pvals <= p.val.subset)] + 1),center=F,scale = T)))
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = pheno.57,phenoname = "Volume")
+#predictions[,2:3] <- predictions[,2:3] - mean(pheno.57$Volume[which(pheno.57$fam_id %in% lgep.fams)])
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+
+# Subset test families from pheno data to see volume accuracy
+test.phenos <- pheno.57[which(as.character(predictions$IID) %in% pheno.57$fam_id),]
+low.acc.fams <- test.phenos$fam_id[which(test.phenos$`Volume Accuracy` < .9)]
+high.acc.pred <- predictions[-which(as.character(predictions$IID) %in% low.acc.fams ),]
+
+cor(high.acc.pred$Ypred,high.acc.pred$Ytest)
+plot(high.acc.pred$Ypred,high.acc.pred$Ytest)
+```
+
+
+##### Use pval adjust
+
+* Generate the adjusted p-values
+
+```{r adjust.pval}
+pvals.adjust <- p.adjust(p = pvals,method = "fdr")
+hist(pvals.adjust)
+```
+
+* Try subsetting on p-value with fdr adjustment: 0.05, .025, 0.01, 0.005
+
+```{r}
+# Subset test families from pheno data to see volume accuracy
+test.phenos <- pheno.57[which(as.character(predictions$IID) %in% pheno.57$fam_id),]
+low.acc.fams <- test.phenos$fam_id[which(test.phenos$`Volume Accuracy` < .9)]
+
+p.val.subset <- seq(to = .1,from = .005,by = .001); cor.weight = .75
+cor.list <- c(); high.acc.cor.list <- c()
+rmse.list <- c(); high.acc.rmse.list <- c()
+
+for(each in 1:length(p.val.subset)){
+cor.mat <- cor(t(scale(log2(fam.asreml.counts[,which(pvals.adjust <= p.val.subset[each])] + 1),center=F,scale = T)))
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(cor.weight),pheno = pheno.57,phenoname = "Volume")
+predictions[,2:3] <- predictions[,2:3] - mean(pheno.57$Volume[which(pheno.57$fam_id %in% lgep.fams)])
+high.acc.pred <- predictions[-which(as.character(predictions$IID) %in% low.acc.fams ),]
+
+cor.list <- c(cor.list,cor(predictions$Ypred,predictions$Ytest))
+high.acc.cor.list <- c(high.acc.cor.list,cor(high.acc.pred$Ypred,high.acc.pred$Ytest))
+
+rmse.list <- c(rmse.list,rmse(predicted = predictions$Ypred,actual = predictions$Ytest))
+high.acc.rmse.list <- c(high.acc.rmse.list,rmse(predicted = high.acc.pred$Ypred,actual = high.acc.pred$Ytest))
+}
+
+# Plot correlation as a function of p-value subset
+plot(p.val.subset,cor.list)
+plot(p.val.subset,rmse.list)
+summary(cor.list)
+plot(cor.list,rmse.list)
+
+# Plot correlation of high accuracy BV's as a function of p-value subset
+plot(p.val.subset,high.acc.cor.list)
+summary(high.acc.cor.list)
+
+plot(p.val.subset,high.acc.rmse.list)
+plot(high.acc.cor.list,high.acc.rmse.list)
+```
+
+```{r}
+p.val.subset <- .025
+cor.mat <- cor(t(scale(log2(fam.asreml.counts[,which(pvals.adjust <= p.val.subset)] + 1),center=F,scale = T)))
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = pheno.57,phenoname = "Volume")
+#predictions[,2:3] <- predictions[,2:3] - mean(pheno.57$Volume[which(pheno.57$fam_id %in% lgep.fams)])
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+
+# Subset test families from pheno data to see volume accuracy
+test.phenos <- pheno.57[which(as.character(predictions$IID) %in% pheno.57$fam_id),]
+low.acc.fams <- test.phenos$fam_id[which(test.phenos$`Volume Accuracy` < .9)]
+high.acc.pred <- predictions[-which(as.character(predictions$IID) %in% low.acc.fams ),]
+cor(high.acc.pred$Ypred,high.acc.pred$Ytest)^2
+plot(high.acc.pred$Ypred,high.acc.pred$Ytest)
+```
+
+```{r}
+p.val.subset <- .001
+cor.mat <- cor(t(scale(log2(fam.asreml.counts[,which(pvals.adjust <= p.val.subset)] + 1),center=F,scale = T)))
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = pheno.57,phenoname = "Volume")
+#predictions[,2:3] <- predictions[,2:3] - mean(pheno.57$Volume[which(pheno.57$fam_id %in% lgep.fams)])
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+
+# Subset test families from pheno data to see volume accuracy
+test.phenos <- pheno.57[which(as.character(predictions$IID) %in% pheno.57$fam_id),]
+low.acc.fams <- test.phenos$fam_id[which(test.phenos$`Volume Accuracy` < .9)]
+high.acc.pred <- predictions[-which(as.character(predictions$IID) %in% low.acc.fams ),]
+
+cor(high.acc.pred$Ypred,high.acc.pred$Ytest)
+plot(high.acc.pred$Ypred,high.acc.pred$Ytest)
+```
+
+#### HYBRID APPROACH
+
+* Try a hybrid approach which leverages biological replicates of training set to predict a family level input
+
+```{r}
+# train.counts contains LGEP counts & train.phenos contain the phenos
+# Join the family level information for prediction
+test.phenos <- pheno.57[which(pheno.57$fam_id %in% ew.fams),]
+low.acc.fams <- which(test.phenos$`Volume Accuracy` < .9)
+
+hybrid.phenos <- rbind(train.phenos[,c("fam_id","Volume","Volume Accuracy")],test.phenos)
+rownames(hybrid.phenos)
+hybrid.counts <- rbind(train.counts,fam.asreml.counts[which( pheno.57$fam_id %in% ew.fams),])
+
+p.val.subset <- seq(to = .1,from = .005,by = .001); cor.weight = .75
+cor.list <- c(); high.acc.cor.list <- c()
+rmse.list <- c(); high.acc.rmse.list <- c()
+
+for(each in 1:length(p.val.subset)){
+cor.mat <- cor(t(scale(log2(hybrid.counts[,which(pvals.adjust <= p.val.subset[each])] + 1),center=F,scale = T)))
+colnames(cor.mat) <- c(1:ncol(cor.mat)); rownames(cor.mat) <- c(1:ncol(cor.mat))
+rownames(hybrid.phenos) <- 1:ncol(cor.mat)
+
+TEST.fams <- which(hybrid.phenos$fam_id %in% ew.fams)
+TRAIN.fams <- c(1:ncol(cor.mat))[-TEST.fams]
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(cor.weight),pheno = hybrid.phenos,phenoname = "Volume")
+predictions[,2:3] <- predictions[,2:3] - mean(pheno.57$Volume[which(pheno.57$fam_id %in% lgep.fams)])
+high.acc.pred <- predictions[-low.acc.fams,]
+
+cor.list <- c(cor.list,cor(predictions$Ypred,predictions$Ytest))
+high.acc.cor.list <- c(high.acc.cor.list,cor(high.acc.pred$Ypred,high.acc.pred$Ytest))
+
+rmse.list <- c(rmse.list,rmse(predicted = predictions$Ypred,actual = predictions$Ytest))
+high.acc.rmse.list <- c(high.acc.rmse.list,rmse(predicted = high.acc.pred$Ypred,actual = high.acc.pred$Ytest))
+}
+
+# Plot correlation as a function of p-value subset
+plot(p.val.subset,cor.list)
+plot(p.val.subset,rmse.list)
+summary(cor.list)
+plot(cor.list,rmse.list)
+
+# Plot correlation of high accuracy BV's as a function of p-value subset
+plot(p.val.subset,high.acc.cor.list)
+summary(high.acc.cor.list)
+
+plot(p.val.subset,high.acc.rmse.list)
+plot(high.acc.cor.list,high.acc.rmse.list)
+
+```
+
+**** The Hybrid approach does not work better than the normal approach.
+
+### GLMNET
+
+* Try GLMNET with adjusted p-vals
+```{r}
+suppressPackageStartupMessages(library(glmnet))
+TEST.fams <- which(pheno.57$fam_id %in% ew.fams)
+TRAIN.fams <- which(pheno.57$fam_id %in% lgep.fams)
+ p.val.subset <- seq(to = .1,from = .005,by = .001);
+
+ # Try on unadjusted pvals
+gl.cor <- c()
+for(each in 1:length(p.val.subset)){
+gl.mod <- glmnet(x = log2(fam.asreml.counts[-TEST.fams,which(pvals <= p.val.subset[each])]+1),
+                  y = pheno.57$Volume[-TEST.fams],alpha = 1) 
+
+ out <- gl.mod$beta
+ select <- which(out[,ncol(out)] > 0)
+predictions <- predict.glmnet(gl.mod,newx = log2(fam.asreml.counts[TEST.fams,which(pvals <= p.val.subset[each])]+1))
+gl.cor <- c(gl.cor,cor(predictions[,ncol(predictions)],test.phenos$Volume))
+}
+plot(p.val.subset,gl.cor)
+
+# ALPHA = 1 Try on adjusted pvals
+gl.cor <- c()
+for(each in 1:length(p.val.subset)){
+gl.mod <- glmnet(x = log2(fam.asreml.counts[-TEST.fams,which(pvals.adjust <= p.val.subset[each])]+1),
+                  y = pheno.57$Volume[-TEST.fams],alpha = 1,standardize = T) 
+
+ out <- gl.mod$beta
+ select <- which(out[,ncol(out)] > 0)
+predictions <- predict.glmnet(gl.mod,newx = log2(fam.asreml.counts[TEST.fams,which(pvals.adjust <= p.val.subset[each])]+1))
+gl.cor <- c(gl.cor,cor(predictions[,ncol(predictions)],test.phenos$Volume))
+}
+plot(p.val.subset,gl.cor)
+
+# ALPHA = 0
+gl.cor <- c()
+for(each in 1:length(p.val.subset)){
+gl.mod <- glmnet(x = log2(fam.asreml.counts[-TEST.fams,which(pvals.adjust <= p.val.subset[each])]+1),
+                  y = pheno.57$Volume[-TEST.fams],alpha = 0,standardize = F) 
+
+ out <- gl.mod$beta
+ select <- which(out[,ncol(out)] > 0)
+predictions <- predict.glmnet(gl.mod,newx = log2(fam.asreml.counts[TEST.fams,which(pvals.adjust <= p.val.subset[each])]+1))
+gl.cor <- c(gl.cor,cor(predictions[,ncol(predictions)],test.phenos$Volume))
+}
+plot(p.val.subset,gl.cor)
+
+# ALPHA = 0.5
+gl.cor <- c()
+for(each in 1:length(p.val.subset)){
+gl.mod <- glmnet(x = log2(fam.asreml.counts[-TEST.fams,which(pvals.adjust <= p.val.subset[each])]+1),
+                  y = pheno.57$Volume[-TEST.fams],alpha = 0.5,standardize = T) 
+
+ out <- gl.mod$beta
+ select <- which(out[,ncol(out)] > 0)
+predictions <- predict.glmnet(gl.mod,newx = log2(fam.asreml.counts[TEST.fams,which(pvals.adjust <= p.val.subset[each])]+1))
+gl.cor <- c(gl.cor,cor(predictions[,ncol(predictions)],test.phenos$Volume))
+}
+plot(p.val.subset,gl.cor)
+
+```
+
+**** The BEST result is using ALPHA=1 & STANDARDIZE=F
+
+* Try GLMNET on all data
+
+```{r}
+TEST.fams <- which(pheno.57$fam_id %in% ew.fams)
+TRAIN.fams <- which(pheno.57$fam_id %in% lgep.fams)
+
+alpha.set <- seq(.01,1,.01)
+gl.cors <- c()
+for(each in 1:length(alpha.set)){
+gl.mod <- glmnet(x = log2(fam.asreml.counts[-TEST.fams,] + 1),
+                  y = pheno.57$Volume[-TEST.fams],alpha = alpha.set[each],standardize = F) 
+predictions <- predict.glmnet(gl.mod,newx = log2(fam.asreml.counts[TEST.fams,]+1))
+gl.cors <- c(gl.cors,cor(predictions[,ncol(predictions)],test.phenos$Volume))
+}
+plot(alpha.set,gl.cors)
+```
+
+
+* Try GLMNET on all data and then pass it to OK
+```{r}
+test.fams <- which(pheno.57$fam_id %in% ew.fams)
+train.fams <- which(pheno.57$fam_id %in% lgep.fams)
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+alpha.set <- seq(.01,1,.01); cor.weight=.75
+gl.cors <- c()
+for(each in 1:length(alpha.set)){
+gl.mod <- glmnet(x = log2(fam.asreml.counts[-test.fams,] + 1),
+                  y = pheno.57$Volume[-test.fams],alpha = alpha.set[each],standardize = F) 
+
+ out <- gl.mod$beta
+ select <- which(out[,ncol(out)] > 0)
+
+cor.mat <- cor(t(scale(log2(fam.asreml.counts[,select] + 1),center=F,scale = T)))
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(cor.weight),pheno = pheno.57,phenoname = "Volume")
+predictions[,2:3] <- predictions[,2:3] - mean(pheno.57$Volume[which(pheno.57$fam_id %in% lgep.fams)])
+gl.cors <- c(gl.cors,cor(predictions$Ypred,predictions$Ytest))}
+plot(alpha.set,gl.cors)
+```
