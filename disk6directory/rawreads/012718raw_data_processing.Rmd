@@ -1,4 +1,12 @@
-# 1/27/18 - 1/29/18 Creating counts from raw reads
+---
+title: 1/27/18 - 1/29/18 Creating counts from raw reads
+output: 
+  html_document: 
+    df_print: tibble
+    toc: yes
+    theme: paper
+    highlight: kate
+---
 
 ## 1. Extract raw data
 
