@@ -81,6 +81,8 @@ The counts were normarlized *multiple* ways, however only the #1 was used for pr
   2.  Using DESEQ2, edgeR, sommer in bio and tech see repo
   
 
-### Step 4 - Filtering
+### Step 4 - Prediction
 
-   Counts returned post-normalization are then applied to X different filters.
+  * LGEP vs. EW prediction Transcripts:
+  
+   Counts returned post-normalization were then used for prediction with OmicKriging and glmnet: [count predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/LGEP_vs_EW/txpts/LGEP_EW_pred.html)
