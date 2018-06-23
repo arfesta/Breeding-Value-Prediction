@@ -10,7 +10,7 @@
     + [Step 1 - Data Prep](#step-1---data-prep)
     + [Step 2 - Load Count Data](#step-2---load-count-data)
     + [Step 3 - Normalization](#step-3---normalization)
-    + [Step 4 - Filtering](#step-4---filtering)
+    + [Step 4 - Prediction](#step-4---prediction)
 
 ## Abstract
 
@@ -83,6 +83,18 @@ The counts were normarlized *multiple* ways, however only the #1 was used for pr
 
 ### Step 4 - Prediction
 
+#### LGEP vs. EW
+
   * LGEP vs. EW prediction Transcripts:
   
    Counts returned post-normalization were then used for prediction with OmicKriging and glmnet: [count predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/LGEP_vs_EW/txpts/LGEP_EW_pred.html)
+   
+  * LGEP vs. EW prediction SNPS:
+  
+  The 012 SNP matrix post filtering was used for prediction with OmicKriging and glment: [snp predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/LGEP_vs_EW/snps/LGEP_EW_pred.snps.html)
+
+  Additionally, the caret package was used to test 12 different models with a LOOCV training on the LGEP: [caret SNP predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/LGEP_vs_EW/snps/LGEP_EW_pred.caret.snpsV2.html)
+  
+#### All Families: LOOCV
+
+  * Predicting all 56 families with txpts: [LOO txpt predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/LOO/txpts/LOO_data_txpt_pred.html)
