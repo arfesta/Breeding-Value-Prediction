@@ -59,6 +59,8 @@ Data Subject Type | Data File Type | Path | Notes
       abundance with Salmon. Additionally, this step includes identification of the indicies used within both batches and creates an experimental info matrix containing all meta data from both batches.
       
    See the [raw reads README](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/rawreads/012718raw_data_processing.html) for step by step processing of files.  
+   
+  Extra prep scripts: [sample index identification](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step1.data_prep/identify_index_used.ouput.html) & [creation of experimental data](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step1.data_prep/create_expt_data.html)
 
 ### Step 2 - Load Count Data
       
