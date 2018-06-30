@@ -1,0 +1,473 @@
+---
+title: 'Prediction of EW Volume BV’s using LGEP: SNPs 012'
+author: "Adam Festa"
+date: "6/10/2018"
+output: 
+  html_document: 
+    number_sections: yes
+    theme: flatly
+    toc: yes
+    toc_depth: 5
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressPackageStartupMessages(library(reshape2)); suppressPackageStartupMessages(library(parallel)); 
+suppressPackageStartupMessages(library(OmicKriging));suppressPackageStartupMessages(library(glmnet)); 
+suppressPackageStartupMessages(library(caret));suppressPackageStartupMessages(library(caretEnsemble));
+suppressPackageStartupMessages(library(Metrics))
+setwd("~/Documents/Grad_Projects/BV_Prediction/mnt/media/disk6/ARF/shared")
+```
+
+## Load data
+
+* Load the --012 output produced during the SNP filtering.
+
+* File loaded below has no missing snps, MAF > .05, and are of at least Q30.
+
+* Additionally, we get the rownames to match the names that are present in the phenos object
+
+```{r load.data}
+# Load matrix, indv file, and snp position file (indv file rownames & snp_pos colnames)
+out.012 <- read.table("./snps/012/Q30.snps.nomiss.maf05.012",header = F)
+rownames(out.012) <- as.character(read.table("./snps/012/Q30.snps.nomiss.maf05.012.indv")[,1])
+colnames(out.012) <- paste0(as.character(read.table("./snps/012/Q30.snps.nomiss.maf05.012.pos")[,1]),
+                            "_",
+                            read.table("./snps/012/Q30.snps.nomiss.maf05.012.pos")[,2])
+
+# Remove any extra "_" characters in the sample names
+rel.colnames <- gsub(rownames(out.012),pattern = "_",replacement = "")
+# Identify those matching the EW samples and replace the following statement
+rel.colnames.ew <- gsub(rel.colnames,pattern = ".ew.bio.rep.merge.bam",replacement = "")
+
+# We need to add "1000" to these names in order to match the phenos, 
+# so here just subset the ones which when the string is forced to be numeric, it has numbers
+ew.bio.reps <- which(!is.na(as.numeric(rel.colnames.ew)))
+
+# The remaining 192 samples are LGEP
+lgep.bio.reps <- c(1:192)[-ew.bio.reps]
+# Now add 1000 to the EW sample names
+mc.ew <- as.numeric(rel.colnames.ew[ew.bio.reps]) + 1000
+
+
+# Subset the lgep bio reps, replace the matching pattern, and remove the index character attached to the sample number
+mc.lgep <- rel.colnames[lgep.bio.reps]
+mc.lgep <- gsub(pattern = "*.lgep.bio.rep.merge.bam",replacement = "",x = mc.lgep)
+mc.lgep <- substr(mc.lgep,1,nchar(mc.lgep)-1)
+
+# Finally replace the original column names with the adjusted colnames and remove vars
+rel.colnames[ew.bio.reps] <- as.character(mc.ew)
+rel.colnames[lgep.bio.reps] <- mc.lgep
+head(rel.colnames)
+rownames(out.012) <- rel.colnames
+rm(rel.colnames,rel.colnames.ew,ew.bio.reps,lgep.bio.reps,mc.ew,mc.lgep)
+
+## Load phenotype data ####
+load("~/Documents/Grad_Projects/Breeding-Value-Prediction/disk6directory/resources/expt.dat.720.RData")
+expt.dat.720$animal_id <- as.character(expt.dat.720$animal_id)
+expt.dat.720$fam_id <- as.character(expt.dat.720$fam_id)
+expt.dat.720$batch <- as.character(expt.dat.720$batch)
+
+# Create bio phenos from individuals with no missing Volume and who have unique, fam*animal*batch*vol combo
+bio.phenos <- unique(expt.dat.720[which(!is.na(expt.dat.720$Volume) ==T),c("fam_id","animal_id","batch","Volume")])
+```
+
+* The bio phenos animal id and 012 matrix have the same style names but are not in the same order. Match 012 genos to phenotype data
+
+```{r match}
+# Subset bio.phenos to only include individuals within the snp mat
+keep.index <-  which(rownames(out.012) %in% bio.phenos$animal_id)
+out.012.subset <- out.012[keep.index,]
+
+bio.pheno.subset <- bio.phenos[which(bio.phenos$animal_id %in% rownames(out.012.subset)),]
+identical(bio.pheno.subset$animal_id[match(rownames(out.012.subset),bio.pheno.subset$animal_id)],rownames(out.012.subset))
+
+bio.pheno.subset <- bio.pheno.subset[match(rownames(out.012.subset),bio.pheno.subset$animal_id),]
+rownames(bio.pheno.subset) <- bio.pheno.subset$animal_id
+```
+
+## Summary stats
+
+```{r summary.counts}
+# Filter BCV ####
+# This near zero var will check for things which have less than 10 or less unique values.
+# Also it'll include a cutoff at 95/5 most common/least common (19:1 ratio)
+check.vars <- nearZeroVar(x = out.012.subset)
+# Let's subset those
+out.012.subset.0var <- out.012.subset[,-check.vars]
+
+# Estimate variance of this set and calculate bcv (sd/mean)
+var.snps <- apply(out.012.subset.0var,2,var)
+sd.snps <- apply(out.012.subset.0var,2,sd)
+mean.snps <- apply(out.012.subset.0var,2,mean)
+bcv.snps <- sd.snps/mean.snps
+
+# histogram shows an interesting bump of some which have high bcv
+hist(bcv.snps)
+hist(var.snps[which(bcv.snps > 3)])
+select.snps <- which(bcv.snps > 3 & var.snps < .2)
+train.dat.bio <- out.012.subset.0var[,select.snps]
+```
+
+## Generate family-level info
+
+* Create family level phenotypes
+
+```{r fam.phenos}
+crossover.fams <- unique(bio.pheno.subset[,c("fam_id","Volume","batch")])
+crossover.fams <- names(which(table(crossover.fams$fam_id) ==2))
+fam.phenos <- unique(bio.pheno.subset[,c("fam_id","Volume")])
+rownames(fam.phenos) <- fam.phenos$fam_id
+u.fams <- unique(fam.phenos$fam_id)
+```
+
+* Create family mean snp counts
+
+```{r fam.mean}
+fam.012 <- matrix(NA,nrow=nrow(fam.phenos),ncol=ncol(out.012.subset))
+for(each.fam in 1:length(u.fams)) {
+  these.rows <- which(bio.pheno.subset$fam_id %in% u.fams[each.fam])
+  if(length(these.rows) < 2) { fam.012[each.fam,] <- unlist(out.012.subset[these.rows,])
+  } else {
+    fam.012[each.fam,] <- apply(out.012.subset[these.rows,],2,mean)
+  }
+}
+
+fam.012.cormat <- matrix(NA,nrow=nrow(fam.phenos),ncol=ncol(train.dat.bio))
+for(each.fam in 1:length(u.fams)) {
+  these.rows <- which(bio.pheno.subset$fam_id %in% u.fams[each.fam])
+  if(length(these.rows) < 2) { fam.012.cormat[each.fam,] <- unlist(train.dat.bio[these.rows,])
+  } else {
+    fam.012.cormat[each.fam,] <- apply(train.dat.bio[these.rows,],2,mean)
+  }
+}
+```
+
+## Predictions
+
+* Establish the training and testing
+
+```{r setup.pred}
+# Split test and train set by batch
+ew.fams <- unique(bio.pheno.subset$fam_id[which(bio.pheno.subset$batch == "EW")])
+lgep.fams <- unique(bio.pheno.subset$fam_id[which(bio.pheno.subset$batch == "LGEP")])
+
+# Remove crossover fams from test set
+ew.fams <- ew.fams[-which(ew.fams %in% crossover.fams)]
+```
+
+### All transcripts: BIO Reps
+
+* Bio-reps: NO SCALING
+```{r alltxpts.bio}
+cor.mat <- cor(t(out.012.subset))
+rownames(cor.mat) <- 1:nrow(bio.pheno.subset); colnames(cor.mat) <- 1:nrow(bio.pheno.subset)
+rownames(bio.pheno.subset) <- 1:nrow(bio.pheno.subset)
+
+TRAIN.fams <- which(bio.pheno.subset$fam_id %in% lgep.fams)
+TEST.fams <- which(bio.pheno.subset$fam_id %in% ew.fams)
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,
+                        corlist = list(cor.mat),H2vec = c(.99),
+                        pheno = bio.pheno.subset,phenoname = "Volume")
+
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+### All transcripts: FAMILY-level
+
+* Fam reps: NO SCALING/CENTERING
+
+```{r alltxpts.fam}
+cor.mat <- cor(t(fam.012))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),
+                        H2vec = c(.99),pheno = fam.phenos,phenoname = "Volume")
+
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+
+### BCV transcripts: FAMILY-level
+
+* BCV > 3 & VAR < .2
+
+```{r bcvtxpts.fam}
+cor.mat <- cor(t(fam.012.cormat))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),
+                        H2vec = c(.99),pheno = fam.phenos,phenoname = "Volume")
+
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+### Linear model regression
+
+* Conduct a linear regression from the LGEP against Volume and use sig txpts to predict EW
+
+```
+train.counts <- out.012.subset[which(bio.pheno.subset$fam_id %in% lgep.fams),]
+train.phenos <- bio.pheno.subset[which(bio.pheno.subset$fam_id %in% lgep.fams),]
+#Apply var filter on train counts to see if any snps will fail
+lgep.var <- apply(train.counts,2,var);  summary(lgep.var)
+# Yes, let's see how many of those which have < .0001 variance
+length(which(lgep.var < .001)) # same number at < .0001 (951)
+
+# Create a loop to dela with low variance which will produce NA's
+pvals <- mclapply(1:ncol(train.counts),function(each.txpt){
+  txpt <- train.counts[,each.txpt]
+  if(var(txpt) < .001){NA} else {
+  summary(lm(train.phenos$Volume ~ txpt))[[4]][[8]]}
+},mc.cores=8)
+pvals <- unlist(pvals)
+hist(pvals)
+
+# Save pvals to load for markdown
+save(pvals,file="EW.LGEP.pvals.snps.RData")
+```
+
+```{r load.pvals, include=FALSE}
+load("EW.LGEP.pvals.snps.RData")
+```
+
+
+#### Use straight p-vals
+
+* Try subsetting on p-value with NO fdr adjustment: 0.05, 0.01, 0.001, 0.0001
+
+```{r pred.pval}
+p.val.subset <- .05
+cor.mat <- cor(t(fam.012[,which(pvals <= p.val.subset)]))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),
+                        H2vec = c(.99),pheno = fam.phenos,phenoname = "Volume")
+#predictions[,2:3] <- predictions[,2:3] - mean(pheno.57$Volume[which(pheno.57$fam_id %in% lgep.fams)])
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+```{r pred.pval2}
+p.val.subset <- .01
+cor.mat <- cor(t(fam.012[,which(pvals <= p.val.subset)]))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),
+                        H2vec = c(.99),pheno = fam.phenos,phenoname = "Volume")
+#predictions[,2:3] <- predictions[,2:3] - mean(pheno.57$Volume[which(pheno.57$fam_id %in% lgep.fams)])
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+```{r pred.pval3}
+p.val.subset <- .001
+cor.mat <- cor(t(fam.012[,which(pvals <= p.val.subset)]))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),
+                        H2vec = c(.99),pheno = fam.phenos,phenoname = "Volume")
+#predictions[,2:3] <- predictions[,2:3] - mean(pheno.57$Volume[which(pheno.57$fam_id %in% lgep.fams)])
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+```{r pred.pval4}
+p.val.subset <- .0001
+cor.mat <- cor(t(fam.012[,which(pvals <= p.val.subset)]))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),
+                        H2vec = c(.99),pheno = fam.phenos,phenoname = "Volume")
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+
+#### Use pval adjust
+
+* Generate the adjusted p-values
+
+```{r adjust.pval}
+pvals.adjust <- p.adjust(p = pvals,method = "fdr")
+hist(pvals.adjust)
+```
+
+* Try subsetting on p-value with fdr adjustment: from 0.005 to 0.1 by .001
+
+```{r}
+p.val.subset <- seq(to = .1,from = .005,by = .001); cor.weight = .99
+cor.list <- c()
+rmse.list <- c()
+
+for(each in 1:length(p.val.subset)){
+cor.mat <- cor(t(fam.012[,which(pvals.adjust <= p.val.subset[each])]))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),
+                        H2vec = c(cor.weight),pheno = fam.phenos,phenoname = "Volume")
+predictions[,2:3] <- predictions[,2:3] - mean(fam.phenos$Volume[which(fam.phenos$fam_id %in% lgep.fams)])
+
+cor.list <- c(cor.list,cor(predictions$Ypred,predictions$Ytest))
+rmse.list <- c(rmse.list,rmse(predicted = predictions$Ypred,actual = predictions$Ytest))
+}
+
+# Plot correlation as a function of p-value subset
+plot(p.val.subset,cor.list)
+plot(p.val.subset,rmse.list)
+summary(cor.list)
+plot(cor.list,rmse.list)
+```
+
+* Take a look at .05 which is around the top prediction.
+
+```{r}
+p.val.subset <- .05
+cor.mat <- cor(t(fam.012[,which(pvals.adjust <= p.val.subset)]))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(.99),pheno = fam.phenos,phenoname = "Volume")
+#predictions[,2:3] <- predictions[,2:3] - mean(pheno.57$Volume[which(pheno.57$fam_id %in% lgep.fams)])
+cor(predictions$Ypred,predictions$Ytest)
+plot(predictions$Ypred,predictions$Ytest)
+```
+
+### GLMNET
+
+####  Try on all data
+
+```{r}
+TEST.fams <- which(fam.phenos$fam_id %in% ew.fams)
+TRAIN.fams <- which(fam.phenos$fam_id %in% lgep.fams)
+
+alpha.set <- seq(0,1,.01)
+gl.cors <- c()
+for(each in 1:length(alpha.set)){
+gl.mod <- glmnet(x = fam.012[-TEST.fams,],
+                  y = fam.phenos$Volume[-TEST.fams],alpha = alpha.set[each],standardize = F) 
+predictions <- predict.glmnet(gl.mod,newx = fam.012[TEST.fams,])
+gl.cors <- c(gl.cors,cor(predictions[,ncol(predictions)],fam.phenos$Volume[TEST.fams]))
+}
+plot(alpha.set,gl.cors)
+```
+
+
+* Try GLMNET on all data and then pass it to OK
+    - Although the code is not run, the output displays supporting evidence that glment(alpha=0) is equivalent to Omic Kriging.
+    
+```
+test.fams <- which(fam.phenos$fam_id %in% ew.fams)
+train.fams <- which(fam.phenos$fam_id %in% lgep.fams)
+
+TRAIN.fams <- lgep.fams
+TEST.fams <- ew.fams
+
+alpha.set <- seq(0,1,.01); cor.weight=.99
+gl.cors <- c()
+for(each in 1:length(alpha.set)){
+gl.mod <- glmnet(x = fam.012[-test.fams,],
+                  y = fam.phenos$Volume[-test.fams],alpha = alpha.set[each],standardize = F) 
+
+ out <- gl.mod$beta
+ select <- which(out[,ncol(out)] > 0)
+
+ cor.mat <- cor(t(fam.012[,select]))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,corlist = list(cor.mat),H2vec = c(cor.weight),pheno = fam.phenos,phenoname = "Volume")
+predictions[,2:3] <- predictions[,2:3] - mean(fam.phenos$Volume[which(fam.phenos$fam_id %in% lgep.fams)])
+gl.cors <- c(gl.cors,cor(predictions$Ypred,predictions$Ytest))}
+
+plot(alpha.set,gl.cors)
+```
+
+#### Use un-adjusted pvals
+
+* Look at unadjusted pvals from .005 to .1 by .001.
+
+```{r unadjusted.pva}
+TEST.fams <- which(fam.phenos$fam_id %in% ew.fams)
+TRAIN.fams <- which(fam.phenos$fam_id %in% lgep.fams)
+p.val.subset <- seq(to = .1,from = .005,by = .001);
+
+ # Try on unadjusted pvals
+gl.cor <- c()
+for(each in 1:length(p.val.subset)){
+gl.mod <- glmnet(x = fam.012[-TEST.fams,which(pvals <= p.val.subset[each])],
+                  y = fam.phenos$Volume[-TEST.fams],alpha = 1,standardize = F) 
+
+predictions <- predict.glmnet(gl.mod,newx = fam.012[TEST.fams,which(pvals <= p.val.subset[each])])
+gl.cor <- c(gl.cor,cor(predictions[,ncol(predictions)],fam.phenos$Volume[TEST.fams]))
+}
+plot(p.val.subset,gl.cor)
+```
+
+#### Try on adjusted pvals
+
+* Do the same for the adjusted p-values with the expectation the we will also test 3 different alpha's: 1,0,.5
+
+```{r adjusted.pva}
+# ALPHA = 1 Try on adjusted pvals ####
+gl.cor <- c()
+for(each in 1:length(p.val.subset)){
+gl.mod <- glmnet(x = fam.012[-TEST.fams,which(pvals.adjust <= p.val.subset[each])],
+                  y = fam.phenos$Volume[-TEST.fams],alpha = 1,standardize = F) 
+
+predictions <- predict.glmnet(gl.mod,newx = fam.012[TEST.fams,which(pvals.adjust <= p.val.subset[each])])
+gl.cor <- c(gl.cor,cor(predictions[,ncol(predictions)],fam.phenos$Volume[TEST.fams]))
+}
+plot(p.val.subset,gl.cor)
+
+# ALPHA = 0 ####
+gl.cor <- c()
+for(each in 1:length(p.val.subset)){
+gl.mod <- glmnet(x = fam.012[-TEST.fams,which(pvals.adjust <= p.val.subset[each])],
+                  y = fam.phenos$Volume[-TEST.fams],alpha = 0,standardize = F) 
+
+predictions <- predict.glmnet(gl.mod,newx = fam.012[TEST.fams,which(pvals.adjust <= p.val.subset[each])])
+gl.cor <- c(gl.cor,cor(predictions[,ncol(predictions)],fam.phenos$Volume[TEST.fams]))
+}
+plot(p.val.subset,gl.cor)
+
+# ALPHA = 0.5 ####
+gl.cor <- c()
+for(each in 1:length(p.val.subset)){
+gl.mod <- glmnet(x = fam.012[-TEST.fams,which(pvals.adjust <= p.val.subset[each])],
+                  y = fam.phenos$Volume[-TEST.fams],alpha = .5,standardize = F) 
+
+predictions <- predict.glmnet(gl.mod,newx = fam.012[TEST.fams,which(pvals.adjust <= p.val.subset[each])])
+gl.cor <- c(gl.cor,cor(predictions[,ncol(predictions)],fam.phenos$Volume[TEST.fams]))
+}
+plot(p.val.subset,gl.cor)
+```
+
+## Save image
+
+```{r save}
+save.image(file="./LGEP_EW_pred.snps.RData",compress=T)
+```

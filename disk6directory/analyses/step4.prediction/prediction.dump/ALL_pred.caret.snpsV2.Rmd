@@ -1,0 +1,591 @@
+---
+title: 'CARET: Predict ALL Fam Volume BV’s : SNPs 012'
+author: "Adam Festa"
+date: "6/16/2018"
+output: 
+  html_document: 
+    number_sections: yes
+    theme: flatly
+    toc: yes
+    toc_depth: 5
+editor_options: 
+  chunk_output_type: console
+---
+```{r setup, include=FALSE}
+summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
+                      conf.interval=.95, .drop=TRUE) {
+  library(plyr)
+  
+  # New version of length which can handle NA's: if na.rm==T, don't count them
+  length2 <- function (x, na.rm=FALSE) {
+    if (na.rm) sum(!is.na(x))
+    else       length(x)
+  }
+  
+  # This does the summary. For each group's data frame, return a vector with
+  # N, mean, and sd
+  datac <- ddply(data, groupvars, .drop=.drop,
+                 .fun = function(xx, col) {
+                   c(N    = length2(xx[[col]], na.rm=na.rm),
+                     mean = mean   (xx[[col]], na.rm=na.rm),
+                     sd   = sd     (xx[[col]], na.rm=na.rm)
+                   )
+                 },
+                 measurevar
+  )
+  
+  # Rename the "mean" column    
+  datac <- rename(datac, c("mean" = measurevar))
+  
+  datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
+  
+  # Confidence interval multiplier for standard error
+  # Calculate t-statistic for confidence interval: 
+  # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+  ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+  datac$ci <- datac$se * ciMult
+  
+  return(datac)
+}
+
+plot.mean.model.preds <- function(model.list=t2){
+results.df <- do.call(cbind,lapply(t2,function(i){(predict(i,EW.test.dat))}))
+colnames(results.df) <- algorithmList;rownames(results.df) <- ew.fams
+results.df<- data.frame(cbind("fam"=EW.test.p,results.df))
+
+library(tidyr)
+data_long <- gather(data = results.df, model, prediction, "glmnet":"svmRadialCost", factor_key=F)
+
+tgc <- summarySE(data_long, measurevar="prediction",groupvars=c("fam"))
+pd <- position_dodge(0.1)
+ggplot(tgc, aes(x=fam, y=prediction, colour=fam, group=fam)) + 
+  geom_errorbar(aes(ymin=prediction-se, ymax=prediction+se), colour="black", width=.1, position=pd) +
+  geom_line(position=pd) +
+  geom_point(position=pd, size=3, shape=21, fill="white") + # 21 is filled circle
+  xlab("True value") +
+  ylab("Predicted Value") +
+  ggtitle("Average Prediction across 12 models") +
+  expand_limits(y=100) +                        # Expand y range
+  scale_y_continuous() +         # Set tick every 4
+  theme_bw() +
+  theme(legend.justification=c(1,0),
+        legend.position=c(1,0))               # Position legend in bottom right 
+}
+create.data.table <- function(model.list=t2) {
+  
+# preallocate data types
+i = 1; MAX = length(model.list);
+x1 <- character() # Name
+x2 <- numeric()   # R2
+x3 <- numeric()   # RMSE
+x4 <- numeric()   # time [s]
+x5 <- character() # long model name
+
+# fill data and check indexes and NA
+for (i in 1:length(model.list)) {
+  x1[i] <- model.list[[i]]$method
+  x2[i] <- as.numeric(model.list[[i]]$results$Rsquared[which.min(model.list[[i]]$results$Rsquared)])
+  x3[i] <- as.numeric(model.list[[i]]$results$RMSE[which.min(model.list[[i]]$results$RMSE)])
+  x4[i] <- as.numeric(model.list[[i]]$times$everything[3])
+  x5[i] <- model.list[[i]]$modelInfo$label
+}
+
+# coerce to data frame
+df1 <- data.frame(x1,x2,x3,x4,x5, stringsAsFactors=FALSE)
+
+# call web browser output with sortable column names
+datatable(df1,  options = list(
+  columnDefs = list(list(className = 'dt-left', targets = c(0,1,2,3,4,5))),
+  pageLength = MAX,
+  order = list(list(2, 'desc'))),
+  colnames = c('Num', 'Name', 'R^2', 'RMSE', 'time [s]', 'Model name'),
+  caption = paste('Regression results from caret models',Sys.time()),
+  class = 'cell-border stripe')  %>% 	       
+  formatRound('x2', 3) %>%  
+  formatRound('x3', 3) %>%
+  formatRound('x4', 3) %>%
+  formatStyle(2,
+              background = styleColorBar(x2, 'steelblue'),
+              backgroundSize = '100% 90%',
+              backgroundRepeat = 'no-repeat',
+              backgroundPosition = 'center')
+}
+knitr::opts_chunk$set(echo = TRUE)
+suppressPackageStartupMessages(library(caret));suppressPackageStartupMessages(library(caretEnsemble)); library(parallel); library(Metrics); library(DT)
+setwd("/mnt/media/disk6/ARF/shared")
+#setwd("~/Documents/Grad_Projects/BV_Prediction/mnt/media/disk6/ARF/shared")
+```
+
+## Load data
+
+* First, load the --012 output produced during the SNP filtering.
+
+* File loaded below has no missing snps, MAF > .05, and are of at least Q30.
+
+* Additionally, the data frame contains rownames for bioloigcal samples and colnames as snp name/position
+
+```{r load.snp.dat}
+load("/mnt/bio.012.df.RData")
+```
+
+* Now load the phenotypes
+
+```{r load phenos}
+## Load phenotype data ####
+#load("~/Documents/Grad_Projects/Breeding-Value-Prediction/disk6directory/resources/expt.dat.720.RData")
+load("/mnt/Breeding-Value-Prediction/disk6directory/resources/expt.dat.720.RData")
+expt.dat.720$animal_id <- as.character(expt.dat.720$animal_id)
+expt.dat.720$fam_id <- as.character(expt.dat.720$fam_id)
+expt.dat.720$batch <- as.character(expt.dat.720$batch)
+
+# Create bio phenos from individuals with no missing Volume and who have unique, fam*animal*batch*vol combo
+bio.phenos <- unique(expt.dat.720[which(!is.na(expt.dat.720$Volume) ==T),c("fam_id","animal_id","batch","Volume")])
+```
+
+* The bio phenos animal id and 012 matrix have the same style names but are not in the same order. Match 012 genos to phenotype data
+
+```{r match}
+# Index the snp data frame to only include individuals which have phenotypes
+keep.index <-  which(rownames(bio.012.df) %in% bio.phenos$animal_id)
+
+# Keep only those rows
+bio.012.df <- bio.012.df[keep.index,]
+
+bio.phenos <- bio.phenos[which(bio.phenos$animal_id %in% rownames(bio.012.df)),]
+identical(bio.phenos$animal_id[match(rownames(bio.012.df),bio.phenos$animal_id)],rownames(bio.012.df))
+
+bio.phenos <- bio.phenos[match(rownames(bio.012.df),bio.phenos$animal_id),]
+rownames(bio.phenos) <- bio.phenos$animal_id
+rm(keep.index)
+```
+
+
+## Generate family-level data
+
+* Generate family phenos
+
+```{r fam.phenos}
+fam.phenos <- unique(bio.phenos[,c("fam_id","Volume")])
+rownames(fam.phenos) <- fam.phenos$fam_id
+u.fams <- unique(fam.phenos$fam_id)
+```
+
+* The family mean SNP matrix was generated once using the FULL bio 012 matrix and then saved. It's loaded here
+
+```{r load.fam}
+load("/mnt/fam.012.df.RData")
+```
+
+## Create test/train matricies
+
+* Some of the filtering methods will use phenotypes, while others will not, but we can go ahead and split the LGEP and EW into train/test for those filtering methods that do use phenos
+
+* The object `train.dat` now contains the LGEP 012 output and the `out.012.subset` object contains the full 189 biological replicates.
+
+## Apply filters
+
+* Apply caret filters including:
+
+    * ANOVA scores: These are generated using phenotypes, so only the LGEP will be used to identify a subset to predict
+    
+    * BCV:  This may be generated without phenotypes, so the whole dataset will be used.
+    
+    * nearzerovar: This may also be used without phenotypes, so the whole dataset will be used.
+
+### Generate anova scores
+
+* Use caret package to generate anova scores with the LGEP 012 counts and phenos (i.e. `train.dat` & `train.phenos` objects)
+
+```
+# Using the biological replicates as the training set, we will subset a single family and then test anova scores across the remaining families.
+family_anova_scores <- mclapply(1:56,function(each.fam){
+ fam.rows <- which(bio.pheno.subset$fam_id %in% u.fams[each.fam])
+ train.dat <- out.012.subset[-fam.rows,]
+ train.p <- bio.pheno.subset$Volume[-fam.rows]
+ apply(train.dat,2,function(each.snp) anovaScores(x = each.snp,y=train.p))
+},mc.cores=32)
+
+save(family_anova_scores,file="./LOO_fam_snp_anova.RData",compress=T)
+```
+
+```{r fam_anova}
+load("/mnt/media/disk6/ARF/shared/LOO_fam_snp_anova.RData")
+# How many of anova scores are less than .05 (unadjusted)
+hist(unlist(lapply(bio_loo_anova_scores,function(x) length(which(x < .05)))))
+# How many of anova scores are less than .05 (adjusted)
+hist(unlist(lapply(bio_loo_anova_scores,function(x) length(which(p.adjust(x) < .05)))))
+```
+
+* A range of 22,000 to 27,000 SNPs are < .05 with unadjusted p-values and approximately 75 to 180 SNPs are found with FDR adjusted p-values < .05 for each LOO CV.
+
+### Filter BCV
+
+* Here we will use the whole 012 data set to identify SNPs who have high BCV relative to all samples (BCV= sd/mean)
+
+```{r bcv.stats}
+# Estimate the variance, sd, mean, and bcv for each SNP
+var.snps <- apply(bio.012.df,2,var)
+sd.snps <- apply(bio.012.df,2,sd)
+mean.snps <- apply(bio.012.df,2,mean)
+bcv.snps <- sd.snps/mean.snps
+
+# Take a look at the distribution of bcv values
+hist(bcv.snps,main = "Histogram of BCV values for the whole 012 dataset",xlab="BCV value",ylab="# of SNPs")
+length(which(bcv.snps > 3))
+# Look at the histogram of variance using only those SNPs with bcv > 3
+hist(var.snps[which(bcv.snps > 3)],main="Histogram of variance for SNPs with BCV > 3",xlab = "variance estimate",ylab = "# of SNPs")
+length(which(var.snps[which(bcv.snps > 3)] < .2))
+interesting.bcv.snps <- which(var.snps[which(bcv.snps > 3)] < .2)
+```
+
+* A total of 9,219 SNPs have BCV values greater than 3.
+
+* There is an interesting set of 624 SNPs which have a BCV greater than 3 but variance less than 0.2
+
+
+### Filter the nearzerovar
+
+* The 'nearzerovar' function will check for things which have less than 10 or less unique values and 95/5 most common/least common (19:1 ratio).  This subset was interesting in the last
+
+```{r check.vars}
+# This near zero var will check for things which have less than 10 or less unique values and 95/5 most common/least common (19:1 ratio)
+check.vars <- nearZeroVar(x = bio.012.df,allowParallel = T)
+
+# How many did not meet these thresholds?
+length(check.vars)
+## 6,624 SNPs did not meet threshold
+```
+
+* A total of 6624 SNPs did not meet this threshold, let's take a look at their BCV values
+
+```{r nearzero.stats}
+hist(bcv.snps[check.vars])
+```
+
+* There is an odd set which have > 3 BCV. Let's subset those out too.
+
+```{r nearzero.bcv}
+near.zero.bcv3.snps <- check.vars[which(bcv.snps[check.vars] > 3)]
+length(near.zero.bcv3.snps)
+```
+
+* A total of 253 SNPs were identified as being removed by the nearzerovar BUT they had BCV > 3. We will keep those for further inspection.
+
+* Do these 253 SNPs show up as significant in the p-adjusted anova scores on the full data?
+
+```{r near.zero.anova}
+#summary(p.adjust(anova_scores)[near.zero.bcv3.snps])
+```
+
+* No, none of these 253 were identified as being associated with the LGEP
+
+* How do the variance of these SNPs look?
+
+```{r near.zero.var}
+summary(var.snps[near.zero.bcv3.snps])
+```
+
+* The SNP variance's are all pretty small. We will still keep this set and use during prediction.
+
+
+
+## Caret pt1: Pressure test multiple models ANOVA < .05
+
+* We have 3 various filters to work with including:
+
+    * Anova scores generated using ONLY LGEP
+    
+    * BCV values generated using ALL data
+    
+    * Nearzerovar subset identified with ALL data (BCV > 3)
+
+* In this section, we will run all *faster* models on the training set (LGEP families) and look at which models tend to perform best in terms of `R2` & `rmse`
+
+### Run all *faster* models on LGEP training
+
+* The LGEP and EW are split into train and test using a specific pvalue which will subset SNPs based on their adjusted pval scores
+
+```{r}
+pval <- .05
+LGEP.train.dat <- fam.012.df[which(fam.phenos$fam_id %in% lgep.fams),which(p.adjust(LGEP.anova.scores) < pval)]
+colnames(LGEP.train.dat) <- colnames(fam.012.df[,which(p.adjust(LGEP.anova.scores) < pval)])
+EW.test.dat <- fam.012.df[which(fam.phenos$fam_id %in% ew.fams),which(p.adjust(LGEP.anova.scores) < pval)]
+colnames(EW.test.dat) <- colnames(fam.012.df[,which(p.adjust(LGEP.anova.scores) < pval)])
+LGEP.train.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% lgep.fams)]
+EW.test.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% ew.fams)]
+```
+
+* Set up a LOOCV training method for the LGEP and conduct a grid search across parameters of 12 different models.
+
+```{r }
+tC <- trainControl(method="LGOCV",allowParallel = F, savePredictions="all",verboseIter = F,search="grid")
+algorithmList <- c("glmnet","pls","bagEarth","bagEarthGCV","cforest","gaussprRadial","knn","penalized","ranger","RRFglobal","svmLinear2","svmRadialCost")
+
+fam.pred.mat <- matrix(NA,nrow = 56,ncol=12)
+for(each.mod in 1:length(algorithmList)){
+  alpha <- .2
+ fam.preds <- unlist(mclapply(1:56,function(each.fam){
+    train.dat <- fam.012.df[-each.fam,which( p.adjust(bio_loo_anova_scores[[each.fam]]) < alpha)]
+    train.p <- fam.phenos$Volume[-each.fam]
+ 
+    test.dat <- fam.012.df[,which( p.adjust(bio_loo_anova_scores[[each.fam]]) < alpha)]
+ 	    set.seed(123)
+ 	    t2 <- train(y=train.p, x=train.dat,"glmnet", trControl = tC)
+      unlist(predict(t2,test.dat)[each.fam])
+    },mc.cores=30))
+ fam.pred.mat[,each.mod] <- fam.preds
+ }
+
+t2 <- lapply(algorithmList,function(i){ 
+  this.alg <- algorithmList[[i]]
+	set.seed(123)
+  mclapply(1:56,function(each.fam){
+	 t2 <- train(y=LGEP.train.p, x=LGEP.train.dat, this.alg, trControl = tC)
+	 predict(t2, EW.test.dat)
+	 },mc.cores=30)
+})
+save(t2,file="/mnt/anova.05.LGEP.EW.RData")
+```
+
+* Extract results from the list and display in table
+
+```{r xtract.sum.mods3,warning=F}
+algorithmList <- c("glmnet","pls","bagEarth","bagEarthGCV","cforest","gaussprRadial","knn","penalized","ranger","RRFglobal","svmLinear2","svmRadialCost")
+load("/mnt/anova.05.LGEP.EW.RData")
+create.data.table()
+```
+
+### Performance on EW test set
+
+* Use each model to predict the EW and then display results
+
+```{r EW.pred1}
+results.cor <- unlist(lapply(t2,function(i){cor(predict(i,EW.test.dat),EW.test.p)}))
+results.rmse <- unlist(lapply(t2,function(i){RMSE(pred = predict(i,EW.test.dat),obs = EW.test.p)}))
+
+plot.mean.model.preds()
+
+plot(results.cor,results.rmse)
+which.min(results.rmse)
+# model 3 lowest MSE
+plot(predict(t2[[3]],EW.test.dat),EW.test.p)
+
+which.max(results.cor)
+plot(EW.test.p,predict(t2[[10]],EW.test.dat))
+```
+
+* Model 3 
+
+## Caret pt2: Pressure test multiple models ANOVA < .8
+
+* Originally, we just used an adjusted pvalue of 0.05, let's try others..(Note..we can only try so many different SNP sets becuase the total number of SNPs with adjusted p-values less than 0.8 is 339)
+
+* Execute the models
+
+```{r}
+pval <- .8
+LGEP.train.dat <- fam.012.df[which(fam.phenos$fam_id %in% lgep.fams),which(p.adjust(LGEP.anova.scores) < pval)]
+colnames(LGEP.train.dat) <- colnames(fam.012.df[,which(p.adjust(LGEP.anova.scores) < pval)])
+EW.test.dat <- fam.012.df[which(fam.phenos$fam_id %in% ew.fams),which(p.adjust(LGEP.anova.scores) < pval)]
+colnames(EW.test.dat) <- colnames(fam.012.df[,which(p.adjust(LGEP.anova.scores) < pval)])
+LGEP.train.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% lgep.fams)]
+EW.test.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% ew.fams)]
+```
+
+```
+algorithmList <- c("glmnet","pls","bagEarth","bagEarthGCV","cforest","gaussprRadial","knn","penalized","ranger","RRFglobal","svmLinear2","svmRadialCost")
+
+t2 <- lapply(algorithmList,function(i){ 
+	set.seed(123)
+	t2 <- train(y=LGEP.train.p, x=LGEP.train.dat, (i), trControl = tC)
+	}
+)
+save(t2,file = "/mnt/anova.8.LGEP.EW.RData",compress=T)
+```
+
+* Extract the results of the models
+```{r }
+load("/mnt/anova.8.LGEP.EW.RData")
+create.data.table()
+```
+
+### Performance on EW test set
+
+```{r EW.pred2}
+results.cor <- unlist(lapply(t2,function(i){cor(predict(i,EW.test.dat),EW.test.p)}))
+results.rmse <- unlist(lapply(t2,function(i){RMSE(pred = predict(i,EW.test.dat),obs = EW.test.p)}))
+
+plot.mean.model.preds()
+
+plot(results.cor,results.rmse)
+this.mod <- which.min(results.rmse)
+# model 3 lowest MSE
+plot(predict(t2[[this.mod]],EW.test.dat),EW.test.p)
+
+this.mod <- which.max(results.cor)
+plot(predict(t2[[this.mod]],EW.test.dat),EW.test.p)
+```
+
+## Caret pt3: Near zero var and BCV > 3
+
+* We've tested the anova_score filtering.  Now let's test SNPs which came out in the near zero var 
+
+```{r}
+LGEP.train.dat <- fam.012.df[which(fam.phenos$fam_id %in% lgep.fams),near.zero.bcv3.snps]
+
+colnames(LGEP.train.dat) <- colnames(fam.012.df[,near.zero.bcv3.snps])
+EW.test.dat <- fam.012.df[which(fam.phenos$fam_id %in% ew.fams),near.zero.bcv3.snps]
+colnames(EW.test.dat) <- colnames(fam.012.df[,near.zero.bcv3.snps])
+LGEP.train.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% lgep.fams)]
+EW.test.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% ew.fams)]
+```
+
+```
+algorithmList <- c("glmnet","pls","bagEarth","bagEarthGCV","cforest","gaussprRadial","knn","penalized","ranger","RRFglobal","svmLinear2","svmRadialCost")
+t2 <- mclapply(algorithmList,function(i){ 
+	set.seed(123)
+	t2 <- train(y=LGEP.train.p, x=LGEP.train.dat, (i), trControl = tC)
+	},mc.cores=30)
+save(t2,file="/mnt/nearzerovar.bcv3.LGEP.EW.RData",compress=T)
+```
+
+* Extract the results of the models
+
+```{r xtract.sum.mods1}
+load("/mnt/nearzerovar.bcv3.LGEP.EW.RData")
+create.data.table()
+```
+
+*Performs badly
+
+## Caret pt4: BCV > 3 var < .2 SNPs
+
+* We've tested the anova_score filtering.  Now let's test those interesting set of SNPs which had a BCV > 3 but variance < .2
+
+* This performs poorly so it's not ran
+
+```
+#interesting.bcv.snps <- which(bcv.snps > 3)
+LGEP.train.dat <- fam.012.df[which(fam.phenos$fam_id %in% lgep.fams),interesting.bcv.snps]
+
+colnames(LGEP.train.dat) <- colnames(fam.012.df[,interesting.bcv.snps])
+EW.test.dat <- fam.012.df[which(fam.phenos$fam_id %in% ew.fams),interesting.bcv.snps]
+colnames(EW.test.dat) <- colnames(fam.012.df[,interesting.bcv.snps])
+LGEP.train.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% lgep.fams)]
+EW.test.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% ew.fams)]
+```
+
+```
+algorithmList <- c("glmnet","pls","bagEarth","bagEarthGCV")
+t2 <- lapply(algorithmList,function(i){ 
+	set.seed(123)
+	t2 <- train(y=LGEP.train.p, x=LGEP.train.dat, (i), trControl = tC)
+	})
+```
+
+* Extract the results of the models
+
+```
+create.data.table()
+```
+
+*Performs badly
+
+## Caret pt5: BCV > 3 & ANOVA < .05
+
+* Here we take a look at SNPs which had a high BCV and an undajusted anova < .05
+
+```{r}
+interesting.bcv.snps <- which(bcv.snps > 3 & LGEP.anova.scores < .05)
+LGEP.train.dat <- fam.012.df[which(fam.phenos$fam_id %in% lgep.fams),interesting.bcv.snps]
+colnames(LGEP.train.dat) <- colnames(fam.012.df[,interesting.bcv.snps])
+EW.test.dat <- fam.012.df[which(fam.phenos$fam_id %in% ew.fams),interesting.bcv.snps]
+colnames(EW.test.dat) <- colnames(fam.012.df[,interesting.bcv.snps])
+LGEP.train.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% lgep.fams)]
+EW.test.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% ew.fams)]
+```
+
+```
+algorithmList <- c("glmnet","pls","bagEarth","bagEarthGCV","cforest","gaussprRadial","knn","penalized","ranger","RRFglobal","svmLinear2","svmRadialCost")
+t2 <- mclapply(algorithmList,function(i){ 
+	set.seed(123)
+	t2 <- train(y=LGEP.train.p, x=LGEP.train.dat, (i), trControl = tC)
+	},mc.cores=30)
+save(t2,file="/mnt/bcv3.anova05.LGEP.EW.RData",compress=T)
+```
+
+* Extract the results of the models
+
+```{r xtract.sum.mods2}
+load("/mnt/bcv3.anova05.LGEP.EW.RData")
+create.data.table()
+```
+
+* Three models performed relatively well: SVMLinear2, pls, and bagearthGCV
+
+```{r prediction}
+results.cor <- unlist(lapply(t2,function(i){cor(predict(i,EW.test.dat),EW.test.p)}))
+results.rmse <- unlist(lapply(t2,function(i){RMSE(pred = predict(i,EW.test.dat),obs = EW.test.p)}))
+
+plot.mean.model.preds()
+
+plot(results.cor,results.rmse)
+this.mod <- which.min(results.rmse)
+plot(predict(t2[[this.mod]],EW.test.dat),EW.test.p,xlab = paste0(algorithmList[this.mod]," predictions"))
+
+this.mod <- which.max(results.cor)
+plot(predict(t2[[this.mod]],EW.test.dat),EW.test.p,xlab = paste0(algorithmList[this.mod]," predictions"))
+```
+
+## Caret pt6: BCV > 3 & adjusted ANOVA < .05
+
+* This is pretty interesting because only 5 snps pass that threshold and when we do this prediction we see that only 2 out of the 11 families have predictions which vary instead of being at or close to the mean training BV
+
+```
+interesting.bcv.snps <- which(bcv.snps > 3 & p.adjust(LGEP.anova.scores) < .05)
+LGEP.train.dat <- fam.012.df[which(fam.phenos$fam_id %in% lgep.fams),interesting.bcv.snps]
+colnames(LGEP.train.dat) <- colnames(fam.012.df[,interesting.bcv.snps])
+EW.test.dat <- fam.012.df[which(fam.phenos$fam_id %in% ew.fams),interesting.bcv.snps]
+colnames(EW.test.dat) <- colnames(fam.012.df[,interesting.bcv.snps])
+LGEP.train.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% lgep.fams)]
+EW.test.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% ew.fams)]
+```
+
+```
+algorithmList <- c("glmnet","pls","bagEarth","bagEarthGCV","cforest","gaussprRadial","knn","penalized","ranger","RRFglobal","svmLinear2","svmRadialCost")
+t2 <- mclapply(algorithmList,function(i){ 
+	set.seed(123)
+	t2 <- train(y=LGEP.train.p, x=LGEP.train.dat, (i), trControl = tC)
+	},mc.cores=30)
+save(t2,file="/mnt/bcv3.anova05.LGEP.EW.RData",compress=T)
+```
+
+* Extract the results of the models
+
+```
+load(file="/mnt/bcv3.anova05.LGEP.EW.RData")
+create.data.table()
+```
+
+* Three models performed relatively well: SVMLinear2, pls, and bagearthGCV
+
+```
+results.cor <- unlist(lapply(t2,function(i){cor(predict(i,EW.test.dat),EW.test.p)}))
+results.rmse <- unlist(lapply(t2,function(i){RMSE(pred = predict(i,EW.test.dat),obs = EW.test.p)}))
+
+plot.mean.model.preds()
+
+plot(results.cor,df1$x2)
+plot(results.cor,results.rmse)
+this.mod <- which.min(results.rmse)
+plot(predict(t2[[this.mod]],EW.test.dat),EW.test.p,xlab = paste0(algorithmList[this.mod]," predictions"))
+
+this.mod <- which.max(results.cor)
+plot(predict(t2[[this.mod]],EW.test.dat),EW.test.p,xlab = paste0(algorithmList[this.mod]," predictions"))
+```
+
+## Save output
+
+```{r}
+save.image("LGEP_EW_pred.caret.snpsV2.RData",compress=T)
+```

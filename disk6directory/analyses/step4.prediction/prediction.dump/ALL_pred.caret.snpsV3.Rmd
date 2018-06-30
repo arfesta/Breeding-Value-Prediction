@@ -1,0 +1,623 @@
+---
+title: 'CARET: Predict ALL Fam Volume BV’s : SNPs 012'
+author: "Adam Festa"
+date: "6/16/2018"
+output: 
+  html_document: 
+    number_sections: yes
+    theme: flatly
+    toc: yes
+    toc_depth: 5
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressPackageStartupMessages(library(reshape2)); suppressPackageStartupMessages(library(parallel)); 
+suppressPackageStartupMessages(library(OmicKriging));suppressPackageStartupMessages(library(glmnet)); 
+suppressPackageStartupMessages(library(caret));suppressPackageStartupMessages(library(caretEnsemble));
+suppressPackageStartupMessages(library(Metrics))
+setwd("/mnt/media/disk6/ARF/shared")
+```
+
+## Load data
+
+* First, load the --012 output produced during the SNP filtering.
+
+* File loaded below has no missing snps, MAF > .05, and are of at least Q30.
+
+* Additionally, the data frame contains rownames for bioloigcal samples and colnames as snp name/position
+
+```{r load.snp.dat}
+load("/mnt/bio.012.df.RData")
+```
+
+* Now load the phenotypes
+
+```{r load phenos}
+## Load phenotype data ####
+#load("~/Documents/Grad_Projects/Breeding-Value-Prediction/disk6directory/resources/expt.dat.720.RData")
+load("/mnt/Breeding-Value-Prediction/disk6directory/resources/expt.dat.720.RData")
+expt.dat.720$animal_id <- as.character(expt.dat.720$animal_id)
+expt.dat.720$fam_id <- as.character(expt.dat.720$fam_id)
+expt.dat.720$batch <- as.character(expt.dat.720$batch)
+
+# Create bio phenos from individuals with no missing Volume and who have unique, fam*animal*batch*vol combo
+bio.phenos <- unique(expt.dat.720[which(!is.na(expt.dat.720$Volume) ==T),c("fam_id","animal_id","batch","Volume")])
+```
+
+* The bio phenos animal id and 012 matrix have the same style names but are not in the same order. Match 012 genos to phenotype data
+
+```{r match}
+# Index the snp data frame to only include individuals which have phenotypes
+keep.index <-  which(rownames(bio.012.df) %in% bio.phenos$animal_id)
+
+# Keep only those rows
+bio.012.df <- bio.012.df[keep.index,]
+
+bio.phenos <- bio.phenos[which(bio.phenos$animal_id %in% rownames(bio.012.df)),]
+identical(bio.phenos$animal_id[match(rownames(bio.012.df),bio.phenos$animal_id)],rownames(bio.012.df))
+
+bio.phenos <- bio.phenos[match(rownames(bio.012.df),bio.phenos$animal_id),]
+rownames(bio.phenos) <- bio.phenos$animal_id
+rm(keep.index)
+```
+
+
+## Generate family-level data
+
+* Generate family phenos
+
+```{r fam.phenos}
+fam.phenos <- unique(bio.phenos[,c("fam_id","Volume")])
+rownames(fam.phenos) <- fam.phenos$fam_id
+u.fams <- unique(fam.phenos$fam_id)
+```
+
+* The family mean SNP matrix was generated once using the FULL bio 012 matrix and then saved. It's loaded here
+
+```{r load.fam}
+load("/mnt/fam.012.df.RData")
+```
+
+## Create test/train matricies
+
+* Some of the filtering methods will use phenotypes, while others will not, but we can go ahead and split the LGEP and EW into train/test for those filtering methods that do use phenos
+
+* The object `train.dat` now contains the LGEP 012 output and the `out.012.subset` object contains the full 189 biological replicates.
+
+## Apply filters
+
+* Apply caret filters including:
+
+    * ANOVA scores: These are generated using phenotypes, so only the LGEP will be used to identify a subset to predict
+    
+    * BCV:  This may be generated without phenotypes, so the whole dataset will be used.
+    
+    * nearzerovar: This may also be used without phenotypes, so the whole dataset will be used.
+
+### Generate anova scores
+
+* Use caret package to generate anova scores with the LGEP 012 counts and phenos (i.e. `train.dat` & `train.phenos` objects)
+
+```{r group_anova}
+# Using the biological replicates as the training set, we will subset a single family and then test anova scores across the remaining families.
+bio_loo_anova_scores <- mclapply(1:56,function(each.fam){
+ fam.rows <- which(bio.phenos$fam_id %in% u.fams[each.fam])
+ train.dat <- bio.012.df[-fam.rows,]
+ train.p <- bio.phenos$Volume[-fam.rows]
+ apply(train.dat,2,function(each.snp) {anovaScores(x = each.snp,y=train.p)})
+},mc.cores=35)
+
+save(bio_loo_anova_scores,file="./LOO_fam_snp_anova.RData",compress=T)
+```
+
+```{r lgep.anova}
+load(file="./LOO_fam_snp_anova.RData")
+# How many of anova scores are less than .05 (unadjusted)
+hist(unlist(lapply(family_anova_scores,function(x) length(which(x < .05)))))
+# How many of anova scores are less than .05 (adjusted)
+hist(unlist(lapply(family_anova_scores,function(x) length(which(p.adjust(x) < .05)))))
+```
+
+* A total of 23,334 SNPs are < .05 with unadjusted p-values and approximately 88 SNPs are found with FDR adjusted p-values < .05
+
+### Filter BCV
+
+* Here we will use the whole 012 data set to identify SNPs who have high BCV relative to all samples (BCV= sd/mean)
+
+```{r bcv.stats}
+# Estimate the variance, sd, mean, and bcv for each SNP
+var.snps <- apply(bio.012.df,2,var)
+sd.snps <- apply(bio.012.df,2,sd)
+mean.snps <- apply(bio.012.df,2,mean)
+bcv.snps <- sd.snps/mean.snps
+
+# Take a look at the distribution of bcv values
+hist(bcv.snps,main = "Histogram of BCV values for the whole 012 dataset",xlab="BCV value",ylab="# of SNPs")
+length(which(bcv.snps > 3))
+# Look at the histogram of variance using only those SNPs with bcv > 3
+hist(var.snps[which(bcv.snps > 3)],main="Histogram of variance for SNPs with BCV > 3",xlab = "variance estimate",ylab = "# of SNPs")
+length(which(var.snps[which(bcv.snps > 3)] < .2))
+interesting.bcv.snps <- which(var.snps[which(bcv.snps > 3)] < .2)
+```
+
+* A total of 9,219 SNPs have BCV values greater than 3.
+
+* There is an interesting set of 624 SNPs which have a BCV greater than 3 but variance less than 0.2
+
+
+### Filter the nearzerovar
+
+* The 'nearzerovar' function will check for things which have less than 10 or less unique values and 95/5 most common/least common (19:1 ratio).  This subset was interesting in the last
+
+```{r check.vars}
+# This near zero var will check for things which have less than 10 or less unique values and 95/5 most common/least common (19:1 ratio)
+check.vars <- nearZeroVar(x = out.012.subset,allowParallel = T)
+
+# How many did not meet these thresholds?
+length(check.vars)
+## 6,624 SNPs did not meet threshold
+```
+
+* A total of 6624 SNPs did not meet this threshold, let's take a look at their BCV values
+
+```{r nearzero.stats}
+hist(bcv.snps[check.vars])
+```
+
+* There is an odd set which have > 3 BCV. Let's subset those out too.
+
+```{r nearzero.bcv}
+near.zero.bcv3.snps <- check.vars[which(bcv.snps[check.vars] > 3)]
+length(near.zero.bcv3.snps)
+```
+
+* A total of 253 SNPs were identified as being removed by the nearzerovar BUT they had BCV > 3. We will keep those for further inspection.
+
+* Do these 253 SNPs show up as significant in the p-adjusted anova scores on the full data?
+
+```{r near.zero.anova}
+#summary(p.adjust(anova_scores)[near.zero.bcv3.snps])
+```
+
+* No, none of these 253 were identified as being associated with the LGEP
+
+* How do the variance of these SNPs look?
+
+```{r near.zero.var}
+summary(var.snps[near.zero.bcv3.snps])
+```
+
+* The SNP variance's are all pretty small. We will still keep this set and use during prediction.
+
+## Caret pt1: Pressure test multiple models ANOVA < .05
+
+* We have 3 various filters to work with including:
+
+    * Anova scores generated using ONLY LGEP
+    
+    * BCV values generated using ALL data
+    
+    * Nearzerovar subset identified with ALL data (BCV > 3)
+
+* In this section, we will run all *faster* models on the training set (LGEP families) and look at which models tend to perform best in terms of `R2` & `rmse`
+
+### Run all *faster* models on LGEP training
+
+* Establish the `trainControl` object
+```{r t.control}
+#Create groups
+set.seed(123)
+test.groups <- lapply(1:100,function(each.rep) sample(u.fams,size = 8))
+test.rows <- lapply(test.groups,function(each.grp)which(bio.pheno.subset$fam_id %in% each.grp))
+train.rows <- lapply(test.groups,function(each.grp)c(1:189)[-which(bio.pheno.subset$fam_id  %in% each.grp)])
+
+group_anova_scores <- mclapply(1:50,function(each.grp){
+ train.dat <- out.012.subset[-test.rows[[each.grp]],]
+ train.p <- bio.pheno.subset$Volume[-test.rows[[each.grp]]]
+ apply(train.dat,2,function(each.snp) anovaScores(x = each.snp,y=train.p))
+},mc.cores=32)
+
+cv.groups <- list(test.groups,test.rows,train.rows,group_anova_scores)
+save(cv.groups,file="./cv.groups.RData",compress=T)
+tC <- trainControl(method="boot",allowParallel = T, savePredictions="all",verboseIter = TRUE,search="grid")
+```
+
+* Tested all models below and sepearted into categories based on performance of LOOCV on LGEP training set
+
+```{r models}
+
+#t2 <- train(y=LGEP.train.p, x=LGEP.train.dat,method = "xyf", trControl = trainControl(method = "LOOCV",verboseIter = T))
+#t2
+#need rjava: extratrees, M5, M5Rules
+# Didn't work: c("bayesglm","blackboost","bstTree","dnn","elm","enet","gamLoess","gaussprLinear", "gaussprPoly","gcvEarth", "glmboost", "kernelpls", "kknn","krlsRadial", "lars" , "lasso", "leapForward", "leapSeq", "mlpWeightDecay", "neuralnet" , "partDSA", "pcaNNet", "pcr", "plsRglm", "ppr", "qrf" , "rf","rbfDDA","ridge", "rlm", "rpart", "rpart2","rqnc", "RRF", "rvmPoly", "rvmRadial", "SBC", "simpls","spls", "superpc" ,"svmLinear","svmPoly", "svmRadial","treebag", "widekernelpls","xgbLinear","xyf")
+
+# Sucky models c("glm","lm","ctree","ctree2","leapBackward","rfRules","WM")
+
+# Take too long..who knows?! c("DENFIS")
+
+# Take long, but good: c("brnn")
+
+#Good Models
+algorithmList <- c("glmnet","pls","bagEarth","bagEarthGCV","cforest","gaussprRadial","knn","penalized","ranger","RRFglobal","svmLinea2","svmRadialCost")
+
+#Decent models c("BstLm","cubist","earth","evtree","icr","rqlasso","xgbTree")
+```
+
+### Dig deeper into "Good" models
+
+* Execute the models
+
+```{r execute.models}
+algorithmList <- c("glmnet","pls","bagEarth","bagEarthGCV","cforest","gaussprRadial","knn","penalized","ranger","RRFglobal","svmLinear2","svmRadialCost")
+tC <- trainControl(method="boot",allowParallel = T, savePredictions="all",verboseIter = F,search="grid")
+#cl <- makeCluster(detectCores()-10); registerDoParallel(cl)
+
+# Set up training
+
+fam.pred.mat <- matrix(NA,nrow=56,ncol=12)
+
+fam.preds <- mclapply(1:50,function(each.grp){
+  fam.test.rows <- which(u.fams %in% bio.pheno.subset$fam_id[test.rows[[each.grp]]])
+train.dat <- fam.012[-fam.test.rows,which( p.adjust(group_anova_scores[[each.grp]]) < .05)]
+train.p <- fam.phenos$Volume[-fam.test.rows]
+
+test.dat <- fam.012[,which( p.adjust(group_anova_scores[[each.grp]]) < .05)]
+
+t2 <- lapply(algorithmList,function(i){ 
+	set.seed(123)
+	t2 <- train(y=train.p, x=train.dat, (i), trControl = tC)
+  })
+
+preds <- unlist(lapply(t2,function(each.mod) predict(each.mod,test.dat)[fam.test.rows]))
+preds
+},mc.cores=25)
+
+stopCluster(cl); registerDoSEQ();
+
+fam.pred.mat <- do.call(rbind,fam.preds)
+
+########## SAVE IMAGE ###############
+save.image(file = "ALL_pred.caret.snpsV3.Rdata",compress=T)
+apply(fam.pred.mat,2,function(each.mod)plot(unlist(each.mod),fam.phenos$Volume))
+
+r2 <- lapply(1:length(t2), function(i) 
+		{cat(sprintf("%-20s",(algorithmList[i])));
+		cat(round(t2[[i]]$results$Rsquared[which.min(t2[[i]]$results$RMSE)],4),"\t");
+		cat(round(t2[[i]]$results$RMSE[which.min(t2[[i]]$results$RMSE)],4),"\t")
+		cat(t2[[i]]$times$everything[3],"\n")
+		}
+)
+unlist(lapply(t2,function(each.mod) rmse(predict(each.mod,test.dat),fam.phenos$Volume[fam.test.rows])))
+stopCluster(cl); registerDoSEQ();
+```
+
+* Extract the results of the models
+
+```{r xtract.sum.mods}
+# preallocate data types
+i = 1; MAX = length(t2);
+x1 <- character() # Name
+x2 <- numeric()   # R2
+x3 <- numeric()   # RMSE
+x4 <- numeric()   # time [s]
+x5 <- character() # long model name
+ 
+# fill data and check indexes and NA
+for (i in 1:length(t2)) {
+    x1[i] <- t2[[i]]$method
+    x2[i] <- as.numeric(t2[[i]]$results$Rsquared[which.min(t2[[i]]$results$RMSE)])
+    x3[i] <- as.numeric(t2[[i]]$results$RMSE[which.min(t2[[i]]$results$RMSE)])
+    x4[i] <- as.numeric(t2[[i]]$times$everything[3])
+    x5[i] <- t2[[i]]$modelInfo$label
+}
+  
+# coerce to data frame
+df1 <- data.frame(x1,x2,x3,x4,x5, stringsAsFactors=FALSE)
+
+# call web browser output with sortable column names
+datatable(df1,  options = list(
+		columnDefs = list(list(className = 'dt-left', targets = c(0,1,2,3,4,5))),
+		pageLength = MAX,
+  		order = list(list(2, 'desc'))),
+		colnames = c('Num', 'Name', 'R^2', 'RMSE', 'time [s]', 'Model name'),
+	        caption = paste('Regression results from caret models',Sys.time()),
+	        class = 'cell-border stripe')  %>% 	       
+	        formatRound('x2', 3) %>%  
+	        formatRound('x3', 3) %>%
+	        formatRound('x4', 3) %>%
+		    formatStyle(2,
+		    background = styleColorBar(x2, 'steelblue'),
+		    backgroundSize = '100% 90%',
+		    backgroundRepeat = 'no-repeat',
+		    backgroundPosition = 'center'
+)
+
+```
+
+
+## Performance on EW test set
+
+```{r EW.pred}
+fam.predictions <- matrix(NA,nrow=56,ncol=12)
+fam.predictions[each.fam,] <- (unlist(lapply(t2,function(each.mod) predict(each.mod,test.dat)[each.fam])))
+
+
+library(doParallel); cl <- makeCluster(detectCores()); registerDoParallel(cl)
+algorithmList <- c("glmnet","pls","bagEarth","bagEarthGCV","cforest","gaussprRadial","knn","penalized","ranger","RRFglobal","svmLinear2","svmRadialCost")
+
+# Set up training
+for(each.fam in 3:56) {
+  cl <- makeCluster(detectCores()); registerDoParallel(cl)
+train.dat <- fam.012[-each.fam,which( p.adjust(family_anova_scores[[each.fam]]) < .05)]
+train.p <- fam.phenos$Volume[-each.fam]
+
+test.dat <- fam.012[,which( p.adjust(family_anova_scores[[each.fam]]) < .05)]
+
+t2 <- lapply(algorithmList,function(i){ 
+	set.seed(123)
+	t2 <- train(y=train.p, x=train.dat, (i), trControl = tC)
+	}
+)
+stopCluster(cl); registerDoSEQ();
+unlist(lapply(t2,function(each.mod) cor(predict(each.mod,test.dat),fam.phenos$Volume[fam.test.rows])))
+print(each.fam)
+}
+
+```
+
+```
+for(each in 7:12) {print(predict(t2[[each]],fam.012)[each.fam])}
+predict(t2[[7]],fam.012)
+results.cor <- unlist(lapply(t2,function(i){cor(predict(i,EW.test.dat),EW.test.p)}))
+results.rmse <- unlist(lapply(t2,function(i){RMSE(pred = predict(i,EW.test.dat),obs = EW.test.p)}))
+
+plot(results.cor,df1$x2)
+plot(results.cor,results.rmse)
+which.min(results.rmse)
+# model 3 lowest MSE
+plot(predict(t2[[3]],EW.test.dat),EW.test.p)
+
+which.max(results.cor)
+plot(predict(t2[[10]],EW.test.dat),EW.test.p)
+```
+
+## NOW...what about other ANOVA threshold set of SNPs?
+
+* Originally, we just used an adjusted pvalue of 0.05, let's try others..(Note..we can only try so many different SNP sets becuase the total number of SNPs with adjusted p-values less than 0.8 is 339)
+
+* Execute the models
+
+```{r}
+pval.thresh <- .8
+LGEP.train.dat <- fam.012[which(fam.phenos$fam_id %in% lgep.fams),which(p.adjust(anova_scores) < pval.thresh)]
+colnames(LGEP.train.dat) <- colnames(fam.012[,which(p.adjust(anova_scores) < pval.thresh)])
+EW.test.dat <- fam.012[which(fam.phenos$fam_id %in% ew.fams),which(p.adjust(anova_scores) < pval.thresh)]
+colnames(EW.test.dat) <- colnames(fam.012[,which(p.adjust(anova_scores) < pval.thresh)])
+LGEP.train.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% lgep.fams)]
+EW.test.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% ew.fams)]
+```
+
+```{r execute.models}
+library(doParallel); cl <- makeCluster(detectCores()); registerDoParallel(cl)
+algorithmList <- c("glmnet","pls","bagEarth","bagEarthGCV","cforest","gaussprRadial","knn","penalized","ranger","RRFglobal","svmLinear2","svmRadialCost")
+
+t2 <- lapply(algorithmList,function(i){ 
+	set.seed(123)
+	t2 <- train(y=LGEP.train.p, x=LGEP.train.dat, (i), trControl = tC)
+	}
+)
+
+r2 <- lapply(1:length(t2), function(i) 
+		{cat(sprintf("%-20s",(algorithmList[i])));
+		cat(round(t2[[i]]$results$Rsquared[which.min(t2[[i]]$results$RMSE)],4),"\t");
+		cat(round(t2[[i]]$results$RMSE[which.min(t2[[i]]$results$RMSE)],4),"\t")
+		cat(t2[[i]]$times$everything[3],"\n")
+		}
+)
+stopCluster(cl); registerDoSEQ();
+```
+
+* Extract the results of the models
+
+```{r xtract.sum.mods}
+# preallocate data types
+i = 1; MAX = length(t2);
+x1 <- character() # Name
+x2 <- numeric()   # R2
+x3 <- numeric()   # RMSE
+x4 <- numeric()   # time [s]
+x5 <- character() # long model name
+ 
+# fill data and check indexes and NA
+for (i in 1:length(t2)) {
+    x1[i] <- t2[[i]]$method
+    x2[i] <- as.numeric(t2[[i]]$results$Rsquared[which.min(t2[[i]]$results$RMSE)])
+    x3[i] <- as.numeric(t2[[i]]$results$RMSE[which.min(t2[[i]]$results$RMSE)])
+    x4[i] <- as.numeric(t2[[i]]$times$everything[3])
+    x5[i] <- t2[[i]]$modelInfo$label
+}
+  
+# coerce to data frame
+df1 <- data.frame(x1,x2,x3,x4,x5, stringsAsFactors=FALSE)
+
+# call web browser output with sortable column names
+datatable(df1,  options = list(
+		columnDefs = list(list(className = 'dt-left', targets = c(0,1,2,3,4,5))),
+		pageLength = MAX,
+  		order = list(list(2, 'desc'))),
+		colnames = c('Num', 'Name', 'R^2', 'RMSE', 'time [s]', 'Model name'),
+	        caption = paste('Regression results from caret models',Sys.time()),
+	        class = 'cell-border stripe')  %>% 	       
+	        formatRound('x2', 3) %>%  
+	        formatRound('x3', 3) %>%
+	        formatRound('x4', 3) %>%
+		    formatStyle(2,
+		    background = styleColorBar(x2, 'steelblue'),
+		    backgroundSize = '100% 90%',
+		    backgroundRepeat = 'no-repeat',
+		    backgroundPosition = 'center'
+)
+```
+
+
+## Performance on EW test set
+
+```{r EW.pred}
+results.cor <- unlist(lapply(t2,function(i){cor(predict(i,EW.test.dat),EW.test.p)}))
+results.rmse <- unlist(lapply(t2,function(i){RMSE(pred = predict(i,EW.test.dat),obs = EW.test.p)}))
+
+plot(results.cor,df1$x2)
+plot(results.cor,results.rmse)
+this.mod <- which.min(results.rmse)
+# model 3 lowest MSE
+plot(predict(t2[[this.mod]],EW.test.dat),EW.test.p)
+
+this.mod <- which.max(results.cor)
+plot(predict(t2[[this.mod]],EW.test.dat),EW.test.p)
+```
+
+## NOW...what BCV > 3 var < .2 SNPs?
+
+* We've fully tested the anova_score filtering.  Now let's test those interesting set of SNPs which had a BCV > 3 but variance > .2
+
+* Execute the models
+
+```{r}
+#interesting.bcv.snps <- which(bcv.snps > 3)
+LGEP.train.dat <- fam.012[which(fam.phenos$fam_id %in% lgep.fams),interesting.bcv.snps]
+
+colnames(LGEP.train.dat) <- colnames(fam.012[,interesting.bcv.snps])
+EW.test.dat <- fam.012[which(fam.phenos$fam_id %in% ew.fams),interesting.bcv.snps]
+colnames(EW.test.dat) <- colnames(fam.012[,interesting.bcv.snps])
+LGEP.train.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% lgep.fams)]
+EW.test.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% ew.fams)]
+```
+
+```{r execute.models}
+library(doParallel); cl <- makeCluster(detectCores()); registerDoParallel(cl)
+algorithmList <- c("glmnet","pls","bagEarth","bagEarthGCV")
+
+t2 <- lapply(algorithmList,function(i){ 
+	set.seed(123)
+	t2 <- train(y=LGEP.train.p, x=LGEP.train.dat, (i), trControl = tC)
+	}
+)
+
+r2 <- lapply(1:length(t2), function(i) 
+		{cat(sprintf("%-20s",(algorithmList[i])));
+		cat(round(t2[[i]]$results$Rsquared[which.min(t2[[i]]$results$RMSE)],4),"\t");
+		cat(round(t2[[i]]$results$RMSE[which.min(t2[[i]]$results$RMSE)],4),"\t")
+		cat(t2[[i]]$times$everything[3],"\n")
+		}
+)
+stopCluster(cl); registerDoSEQ();
+```
+
+* Extract the results of the models
+
+```{r xtract.sum.mods}
+# preallocate data types
+i = 1; MAX = length(t2);
+x1 <- character() # Name
+x2 <- numeric()   # R2
+x3 <- numeric()   # RMSE
+x4 <- numeric()   # time [s]
+x5 <- character() # long model name
+ 
+# fill data and check indexes and NA
+for (i in 1:length(t2)) {
+    x1[i] <- t2[[i]]$method
+    x2[i] <- as.numeric(t2[[i]]$results$Rsquared[which.min(t2[[i]]$results$RMSE)])
+    x3[i] <- as.numeric(t2[[i]]$results$RMSE[which.min(t2[[i]]$results$RMSE)])
+    x4[i] <- as.numeric(t2[[i]]$times$everything[3])
+    x5[i] <- t2[[i]]$modelInfo$label
+}
+  
+# coerce to data frame
+df1 <- data.frame(x1,x2,x3,x4,x5, stringsAsFactors=FALSE)
+
+# call web browser output with sortable column names
+datatable(df1,  options = list(
+		columnDefs = list(list(className = 'dt-left', targets = c(0,1,2,3,4,5))),
+		pageLength = MAX,
+  		order = list(list(2, 'desc'))),
+		colnames = c('Num', 'Name', 'R^2', 'RMSE', 'time [s]', 'Model name'),
+	        caption = paste('Regression results from caret models',Sys.time()),
+	        class = 'cell-border stripe')  %>% 	       
+	        formatRound('x2', 3) %>%  
+	        formatRound('x3', 3) %>%
+	        formatRound('x4', 3) %>%
+		    formatStyle(2,
+		    background = styleColorBar(x2, 'steelblue'),
+		    backgroundSize = '100% 90%',
+		    backgroundRepeat = 'no-repeat',
+		    backgroundPosition = 'center'
+)
+```
+
+
+## Performance on EW test set
+
+```{r EW.pred}
+results.cor <- unlist(lapply(t2,function(i){cor(predict(i,EW.test.dat),EW.test.p)}))
+results.rmse <- unlist(lapply(t2,function(i){RMSE(pred = predict(i,EW.test.dat),obs = EW.test.p)}))
+
+plot(results.cor,df1$x2)
+plot(results.cor,results.rmse)
+this.mod <- which.min(results.rmse)
+# model 3 lowest MSE
+plot(predict(t2[[this.mod]],EW.test.dat),EW.test.p)
+
+this.mod <- which.max(results.cor)
+plot(predict(t2[[this.mod]],EW.test.dat),EW.test.p)
+```
+
+# Stacking Algorithms - Run multiple algos in one call.((
+
+
+# Create groups for training
+#grp.list <- vector("list")
+#new.l <- 1:56
+#for(each in 1:7){
+#grp.list[[each]] <- sample(new.l,replace = F,size = 8)
+#new.l <- new.l[-unlist(grp.list[[each]])]
+#}
+
+# Set up the train control
+trainControl <- trainControl(method="repeatedcv",repeats=50,allowParallel = T, savePredictions="all",verboseIter = TRUE,search="grid")
+#algorithmList <- c('earth','bagEarth','glmnet','xgbDART','xgbLinear','glmboost','treebag','rf','BstLm')
+#algorithmList <- c('bayesglm','glm')'svmLinear2'superpc'rrlda, rlm ,foba,ridge,RRF,rfRules,glm.nb
+
+algorithmList <- c('glmnet','glm')
+
+models <- caretList(y=train.p,x=train.dat,  trControl=trainControl, methodList=algorithmList,continue_on_fail = T)
+results <- resamples(models)
+summary(results)
+
+# Box plots to compare models
+scales <- list(x=list(relation="free"), y=list(relation="free"))
+bwplot(results, scales=scales)
+
+trainControl <- trainControl(method="LOOCV",allowParallel = T, savePredictions="all",verboseIter = TRUE,search="grid")
+pred <- vector()
+  set.seed(100)
+  train.p <- fam.phenos$Volume[which(fam.phenos$fam_id %in% lgep.fams)]
+  train.dat <- fam.012.cormat[which(fam.phenos$fam_id %in% lgep.fams),]
+  #train.p <- fam.phenos$Volume[-check.samp]
+  #train.dat <- fam.012.cormat[-check.samp,]
+  colnames(train.dat) <- 1:ncol(train.dat)
+  #mod1 <- train(y=train.p,x = train.dat,trControl=trainControl,method="ridge")
+  mod1 <- train(y=train.p,x = train.dat,trControl=trainControl,method="glmnet")
+  #mod1 <- train(y=train.p,x = train.dat,trControl=trainControl,method="BstLm")
+  #mod1
+  test.dat <- fam.012.cormat; colnames(test.dat) <- colnames(train.dat)
+  #pred <- c(pred,predict(mod1,test.dat)[check.samp])
+  pred <- c(pred,predict(mod1,test.dat)[which(fam.phenos$fam_id %in% ew.fams)])
+  #plot(pred,fam.phenos$Volume[1:check.samp])
+  plot(pred,fam.phenos$Volume[which(fam.phenos$fam_id %in% ew.fams)])
+}
+abline(h=mean(fam.phenos$Volume),v=mean(pred))
+plot(pred[-c(2,15,32,48)],fam.phenos$Volume[-c(2,15,32,48)])

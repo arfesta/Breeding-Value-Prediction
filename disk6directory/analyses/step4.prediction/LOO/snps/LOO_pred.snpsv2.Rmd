@@ -1,0 +1,523 @@
+---
+title: 'Prediction of EW Volume BV’s using LGEP: SNPs 012'
+author: "Adam Festa"
+date: "6/10/2018"
+output: 
+  html_document: 
+    number_sections: yes
+    theme: flatly
+    toc: yes
+    toc_depth: 5
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+suppressPackageStartupMessages(library(reshape2)); suppressPackageStartupMessages(library(parallel)); 
+suppressPackageStartupMessages(library(OmicKriging));suppressPackageStartupMessages(library(glmnet)); 
+suppressPackageStartupMessages(library(caret));suppressPackageStartupMessages(library(caretEnsemble));
+suppressPackageStartupMessages(library(Metrics))
+setwd("/mnt/media/disk6/ARF/shared")
+```
+
+## Load data
+
+* First, load the --012 output produced during the SNP filtering.
+
+* File loaded below has no missing snps, MAF > .05, and are of at least Q30.
+
+* Additionally, the data frame contains rownames for bioloigcal samples and colnames as snp name/position
+
+```{r load.snp.dat}
+load("/mnt/bio.012.df.RData")
+```
+
+* Now load the phenotypes
+
+```{r load phenos}
+## Load phenotype data ####
+#load("~/Documents/Grad_Projects/Breeding-Value-Prediction/disk6directory/resources/expt.dat.720.RData")
+load("/mnt/Breeding-Value-Prediction/disk6directory/resources/expt.dat.720.RData")
+expt.dat.720$animal_id <- as.character(expt.dat.720$animal_id)
+expt.dat.720$fam_id <- as.character(expt.dat.720$fam_id)
+expt.dat.720$batch <- as.character(expt.dat.720$batch)
+
+# Create bio phenos from individuals with no missing Volume and who have unique, fam*animal*batch*vol combo
+bio.phenos <- unique(expt.dat.720[which(!is.na(expt.dat.720$Volume) ==T),c("fam_id","animal_id","batch","Volume")])
+```
+
+* The bio phenos animal id and 012 matrix have the same style names but are not in the same order. Match 012 genos to phenotype data
+
+```{r match}
+# Index the snp data frame to only include individuals which have phenotypes
+keep.index <-  which(rownames(bio.012.df) %in% bio.phenos$animal_id)
+
+# Keep only those rows
+bio.012.df <- bio.012.df[keep.index,]
+
+bio.phenos <- bio.phenos[which(bio.phenos$animal_id %in% rownames(bio.012.df)),]
+identical(bio.phenos$animal_id[match(rownames(bio.012.df),bio.phenos$animal_id)],rownames(bio.012.df))
+
+bio.phenos <- bio.phenos[match(rownames(bio.012.df),bio.phenos$animal_id),]
+rownames(bio.phenos) <- bio.phenos$animal_id
+rm(keep.index)
+```
+
+
+## Generate family-level data
+
+* Generate family phenos
+
+```{r fam.phenos}
+fam.phenos <- unique(bio.phenos[,c("fam_id","Volume")])
+rownames(fam.phenos) <- fam.phenos$fam_id
+u.fams <- unique(fam.phenos$fam_id)
+```
+
+* The family mean SNP matrix was generated once using the FULL bio 012 matrix and then saved. It's loaded here
+
+```{r load.fam}
+load("/mnt/fam.012.df.RData")
+```
+
+## Apply filters
+
+* Apply caret filters including:
+
+    * ANOVA scores: These are generated using phenotypes, so only the LGEP will be used to identify a subset to predict
+    
+    * BCV:  This may be generated without phenotypes, so the whole dataset will be used.
+    
+    * nearzerovar: This may also be used without phenotypes, so the whole dataset will be used.
+
+### Generate anova scores
+
+* Use caret package to generate anova scores with the LGEP 012 counts and phenos (i.e. `train.dat` & `train.phenos` objects)
+
+```
+# Using the biological replicates as the training set, we will subset a single family and then test anova scores across the remaining families.
+family_anova_scores <- mclapply(1:56,function(each.fam){
+ fam.rows <- which(bio.pheno.subset$fam_id %in% u.fams[each.fam])
+ train.dat <- out.012.subset[-fam.rows,]
+ train.p <- bio.pheno.subset$Volume[-fam.rows]
+ apply(train.dat,2,function(each.snp) anovaScores(x = each.snp,y=train.p))
+},mc.cores=32)
+
+save(family_anova_scores,file="./LOO_fam_snp_anova.RData",compress=T)
+```
+
+```{r fam_anova}
+load("/mnt/LOO_prediction_files/LOO_fam_snp_anova.RData")
+# How many of anova scores are less than .05 (unadjusted)
+hist(unlist(lapply(family_anova_scores,function(x) length(which(x < .05)))),main="# of SNPs which p < .05")
+# How many of anova scores are less than .05 (adjusted)
+hist(unlist(lapply(family_anova_scores,function(x) length(which(p.adjust(x) < .05)))),main="# of SNPs which adjusted p < .05")
+```
+
+* A range of 22,000 to 27,000 SNPs are < .05 with unadjusted p-values and approximately 75 to 180 SNPs are found with FDR adjusted p-values < .05 for each LOO CV.
+
+### Filter BCV
+
+* Here we will use the whole 012 data set to identify SNPs who have high BCV relative to all samples (BCV= sd/mean)
+
+```{r bcv.stats}
+# Estimate the variance, sd, mean, and bcv for each SNP
+var.snps <- apply(bio.012.df,2,var)
+sd.snps <- apply(bio.012.df,2,sd)
+mean.snps <- apply(bio.012.df,2,mean)
+bcv.snps <- sd.snps/mean.snps
+
+# Take a look at the distribution of bcv values
+hist(bcv.snps,main = "Histogram of BCV values for the whole 012 dataset",xlab="BCV value",ylab="# of SNPs")
+length(which(bcv.snps > 3))
+# Look at the histogram of variance using only those SNPs with bcv > 3
+hist(var.snps[which(bcv.snps > 3)],main="Histogram of variance for SNPs with BCV > 3",xlab = "variance estimate",ylab = "# of SNPs")
+length(which(var.snps[which(bcv.snps > 3)] < .2))
+interesting.bcv.snps <- which(var.snps[which(bcv.snps > 3)] < .2)
+```
+
+* A total of 9,219 SNPs have BCV values greater than 3.
+
+* There is an interesting set of 624 SNPs which have a BCV greater than 3 but variance less than 0.2
+
+
+### Filter the nearzerovar
+
+* The 'nearzerovar' function will check for things which have less than 10 or less unique values and 95/5 most common/least common (19:1 ratio).  This subset was interesting in the last
+
+```{r check.vars}
+# This near zero var will check for things which have less than 10 or less unique values and 95/5 most common/least common (19:1 ratio)
+check.vars <- nearZeroVar(x = bio.012.df,allowParallel = T)
+
+# How many did not meet these thresholds?
+length(check.vars)
+## 6,624 SNPs did not meet threshold
+```
+
+* A total of 6624 SNPs did not meet this threshold, let's take a look at their BCV values
+
+```{r nearzero.stats}
+hist(bcv.snps[check.vars])
+hist(bcv.snps[-check.vars])
+bcv.3.snps <- which(bcv.snps > 3)
+```
+
+* There is an odd set which have > 3 BCV. Let's subset those out too.
+
+```{r nearzero.bcv}
+near.zero.bcv3.snps <- bcv.3.snps[which(bcv.3.snps %in% check.vars)]
+far.zero.bcv3.snps <- bcv.3.snps[-which(bcv.3.snps %in% check.vars)]
+```
+
+* Roughly 8966 SNPs had a bcv > 3 and were not removed by the nearzero filter
+
+* A total of 253 SNPs were identified as being removed by the nearzerovar BUT they had BCV > 3. We will keep those for further inspection.
+
+* How do the variance of these SNPs look?
+
+```{r near.zero.var}
+summary(var.snps[near.zero.bcv3.snps])
+summary(var.snps[far.zero.bcv3.snps])
+```
+
+## Predictions
+
+* Only output is displayed. The code for the predictions is available in the markdown file on github
+
+* In all cases a LOO CV was done by removing a single family and training on the remaining families
+
+### First pass
+
+All transcripts: BIO Reps
+
+* Bio-reps: All 140K SNPs x 189 biological replicates were converted into a correlation matrix and used with OmicKriging to predict volume breeding values in a LOOCV. Since almost all families contain more than 1 biological rep, the family mean is taken for each set of predictions.  Varying correlation weights were used to evaulate the impact of the weight on the prediction accuracy.
+
+All transcripts: FAMILY-level
+
+* Fam reps: Instead of using the biological rep SNP matrix, this time the family mean SNP matrix is used. Since the data frame has 56 rows we do not have to take the mean of predictions here.
+
+BCV transcripts: FAMILY-level
+
+* Test only included Snps where the BCV > 3
+
+* Test BCV > 3 and var > .2 OR < .2
+
+* Test no near zero var and BCV > 3
+
+```{r all.pred,echo=FALSE}
+cor.weights <- seq(.01,.99,.01)
+cor.mat <- cor(t(bio.012.df))
+rownames(cor.mat) <- 1:nrow(bio.phenos); colnames(cor.mat) <- 1:nrow(bio.phenos)
+rownames(bio.phenos) <- 1:nrow(bio.phenos)
+
+fam.cors <- unlist(mclapply(1:length(cor.weights),function(each.weight){
+  c.weight <- cor.weights[each.weight]
+  fam.predictions <- sapply(1:length(u.fams),function(each.fam){
+    TEST.fams <- which(bio.phenos$fam_id %in% u.fams[each.fam])
+    TRAIN.fams <- c(1:189)[-TEST.fams]
+    predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,
+                            corlist = list(cor.mat),H2vec = c(c.weight),
+                            pheno = bio.phenos,phenoname = "Volume")
+    mean(predictions[,2])
+  })
+  
+  cor(fam.predictions,fam.phenos$Volume)
+},mc.cores=34))
+
+gg.data1 <- data.frame(cbind("cor"=fam.cors,"weight"=cor.weights))
+
+#ggplot(data = gg.data,aes(x=cor,y=weight,colour=cor))+
+#  geom_point() + labs(x="Predicted BV vs. True BV correlation (r)",y="Weight used on correlation matrix",colour #= "(r) value") + ggtitle(paste0("EW prediction vs. test correlations across weights using \n OmicKriging and #biological SNPs")) 
+
+
+cor.mat <- cor(t(fam.012.df))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+cor.weights <- seq(.01,.99,.01)
+
+fam.cors <- unlist(mclapply(1:length(cor.weights),function(each.weight){
+  c.weight <- cor.weights[each.weight]
+  
+  fam.predictions <- sapply(1:length(u.fams),function(each.fam){
+    TEST.fams <- u.fams[each.fam]
+    TRAIN.fams <- u.fams[-each.fam]
+    predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,
+                            corlist = list(cor.mat),H2vec = c(c.weight),
+                            pheno = fam.phenos,phenoname = "Volume")
+    (predictions[,2])
+  })
+  cor(fam.predictions,fam.phenos$Volume)
+},mc.cores=34))
+
+gg.data2 <- data.frame(cbind("cor"=fam.cors,"weight"=cor.weights))
+
+#ggplot(data = gg.data,aes(x=cor,y=weight,colour=cor))+
+#  geom_point() + labs(x="Predicted BV vs. True BV correlation (r)",y="Weight used on correlation matrix",colour #= "(r) value") + ggtitle(paste0("EW prediction vs. test correlations across weights using \n OmicKriging and #family-mean SNPs")) 
+
+
+select.snps <- which(bcv.snps > 3)
+cor.mat <- cor(t(fam.012.df[, select.snps]))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+
+fam.cors <- unlist(mclapply(1:length(cor.weights),function(each.weight){
+  c.weight <- cor.weights[each.weight]
+  
+  fam.predictions <- sapply(1:length(u.fams),function(each.fam){
+    TEST.fams <- u.fams[each.fam]
+    TRAIN.fams <- u.fams[-each.fam]
+    predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,
+                            corlist = list(cor.mat),H2vec = c(c.weight),
+                            pheno = fam.phenos,phenoname = "Volume")
+    (predictions[,2])
+  })
+  cor(fam.predictions,fam.phenos$Volume)
+},mc.cores=34))
+
+gg.data3 <- data.frame(cbind("cor"=fam.cors,"weight"=cor.weights))
+
+#ggplot(data = gg.data,aes(x=cor,y=weight,colour=cor))+
+#  geom_point() + labs(x="Predicted BV vs. True BV correlation (r)",y="Weight used on correlation matrix",colour #= "(r) value") + ggtitle(paste0("EW prediction vs. test correlations across weights using \n OmicKriging and #family-mean SNPs: BCV > 3")) 
+
+
+select.snps <- which(bcv.snps > 3 & var.snps < .2)
+cor.mat <- cor(t(fam.012.df[, select.snps]))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+
+fam.cors <- unlist(mclapply(1:length(cor.weights),function(each.weight){
+  c.weight <- cor.weights[each.weight]
+  
+  fam.predictions <- sapply(1:length(u.fams),function(each.fam){
+    TEST.fams <- u.fams[each.fam]
+    TRAIN.fams <- u.fams[-each.fam]
+    predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,
+                            corlist = list(cor.mat),H2vec = c(c.weight),
+                            pheno = fam.phenos,phenoname = "Volume")
+    (predictions[,2])
+  })
+  cor(fam.predictions,fam.phenos$Volume)
+},mc.cores=34))
+
+gg.data4 <- data.frame(cbind("cor"=fam.cors,"weight"=cor.weights))
+
+#ggplot(data = gg.data,aes(x=cor,y=weight,colour=cor))+
+#  geom_point() + labs(x="Predicted BV vs. True BV correlation (r)",y="Weight used on correlation matrix",colour #= "(r) value") + ggtitle(paste0("EW prediction vs. test correlations across weights using \n OmicKriging and #family-mean SNPs: BCV > 3 & var < .2")) 
+
+
+select.snps <- which(bcv.snps > 3 & var.snps > .2)
+cor.mat <- cor(t(fam.012.df[, select.snps]))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+
+fam.cors <- unlist(mclapply(1:length(cor.weights),function(each.weight){
+  c.weight <- cor.weights[each.weight]
+  
+  fam.predictions <- sapply(1:length(u.fams),function(each.fam){
+    TEST.fams <- u.fams[each.fam]
+    TRAIN.fams <- u.fams[-each.fam]
+    predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,
+                            corlist = list(cor.mat),H2vec = c(c.weight),
+                            pheno = fam.phenos,phenoname = "Volume")
+    (predictions[,2])
+  })
+  cor(fam.predictions,fam.phenos$Volume)
+},mc.cores=34))
+
+gg.data5 <- data.frame(cbind("cor"=fam.cors,"weight"=cor.weights))
+
+#ggplot(data = gg.data,aes(x=cor,y=weight,colour=cor))+
+#  geom_point() + labs(x="Predicted BV vs. True BV correlation (r)",y="Weight used on correlation matrix",colour #= "(r) value") + ggtitle(paste0("EW prediction vs. test correlations across weights using \n OmicKriging and #family-mean SNPs: BCV > 3 & var > .2")) 
+
+select.snps <- far.zero.bcv3.snps
+cor.mat <- cor(t(fam.012.df[, select.snps]))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+
+fam.cors <- unlist(mclapply(1:length(cor.weights),function(each.weight){
+  c.weight <- cor.weights[each.weight]
+  
+  fam.predictions <- sapply(1:length(u.fams),function(each.fam){
+    TEST.fams <- u.fams[each.fam]
+    TRAIN.fams <- u.fams[-each.fam]
+    predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,
+                            corlist = list(cor.mat),H2vec = c(c.weight),
+                            pheno = fam.phenos,phenoname = "Volume")
+    (predictions[,2])
+  })
+  cor(fam.predictions,fam.phenos$Volume)
+},mc.cores=34))
+
+gg.data6 <- data.frame(cbind("cor"=fam.cors,"weight"=cor.weights))
+
+all.gg <- cbind(gg.data1[,1],gg.data2[,1],gg.data3[,1],gg.data4[,1],gg.data5[,1],gg.data6[,1])
+all.gg.melt <- melt(data = all.gg,id="method")
+all.gg.melt[,1] <- all.gg.melt[,1]/100
+colnames(all.gg.melt) <- c("weight","method","cor")
+
+
+ggplot(data = all.gg.melt,aes(x=cor,y=weight,colour=as.factor(method))) +
+  geom_point() + labs(x="Predicted BV vs. True BV correlation (r)",y="Weight used on correlation matrix",color="Model") + ggtitle(paste0("EW prediction vs. test correlations across weights using \n OmicKriging across 6 different approaches")) 
+```
+
+### OK: Adjusted ANOVA
+
+* Generate the adjusted p-values
+
+```{r adjust.pval}
+family_anova_padjust <- lapply(family_anova_scores,function(each.anova) p.adjust(p = each.anova,method = "fdr"))
+```
+
+* Try subsetting on p-value with fdr adjustment: from 0.01 to 0.1 by .001 with cor weight set to .99
+
+```{r,echo=F}
+p.val.subset <- seq(to = .1,from = .01,by = .001); cor.weight = .99
+cor.list <- c();rmse.list <- c()
+
+for(each in 1:length(p.val.subset)){
+ fam.preds <- unlist(mclapply(1:56,function(each.fam){
+cor.mat <- cor(t(fam.012.df[,which(family_anova_padjust[[each.fam]] <= p.val.subset[each])]))
+rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+
+TEST.fams <- u.fams[each.fam]
+TRAIN.fams <- u.fams[-each.fam]
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,
+                        corlist = list(cor.mat),H2vec = c(cor.weight),
+                        pheno = fam.phenos,phenoname = "Volume")
+(predictions[,2])},mc.cores=34))
+
+cor.list <- c(cor.list,cor(fam.preds,fam.phenos$Volume))
+rmse.list <- c(rmse.list,rmse(fam.preds,fam.phenos$Volume))
+}
+
+# Plot correlation as a function of p-value subset
+plot(p.val.subset,cor.list,xlab = "pvalue threshold used",ylab = "Correlation (r) of true~prediction",main="Correlation(r) vs. P-value threshold with OmicKriging")
+plot(p.val.subset,rmse.list,xlab = "pvalue threshold used",ylab = "RMSE of true~prediction",main="RMSE vs. P-value threshold with OmicKriging")
+summary(cor.list)
+plot(cor.list,rmse.list,main="RMSE vs. correlation (r) across the pval subsets",ylab = "RMSE of true~prediction",xlab="Correlation (r) of true~prediction")
+```
+
+* Take a look at .02 which is around the top prediction.
+
+```{r}
+p.val.subset <- .02
+
+fam.preds <- unlist(mclapply(1:56,function(each.fam){
+    cor.mat <- cor(t(fam.012.df[,which(family_anova_padjust[[each.fam]] <= p.val.subset)]))
+    rownames(cor.mat) <- rownames(fam.phenos); colnames(cor.mat) <- rownames(fam.phenos)
+
+TEST.fams <- u.fams[each.fam]
+TRAIN.fams <- u.fams[-each.fam]
+predictions <- okriging(idtest = TEST.fams,idtrain = TRAIN.fams,
+                        corlist = list(cor.mat),H2vec = c(cor.weight),
+                        pheno = fam.phenos,phenoname = "Volume")
+(predictions[,2])},mc.cores=34))
+ 
+plot(fam.preds,fam.phenos$Volume,ylab="True Breeding Value", xlab="Predicted Breeding Value")
+```
+
+### GLMNET
+
+All data was tested at 0, .5 and alpha =1.  Alpha=0 performed the best (.2 =r ) while the others were close to 0
+
+```
+alpha.set <- c(0,.5,1)
+gl.cors <- c(); gl.rmse <- c()
+for(each.alpha in 1:length(alpha.set)) {
+  
+  this.alpha <- alpha.set[each.alpha]
+  
+      gl.preds <- unlist(mclapply(1:length(u.fams),function(each.fam){
+            gl.mod <- glmnet(x = fam.012.df[-each.fam,],
+                  y = fam.phenos$Volume[-each.fam],alpha = this.alpha,standardize = F) 
+            predictions <- predict.glmnet(gl.mod,newx = fam.012.df)
+            predictions[each.fam,ncol(predictions)] 
+            },mc.cores=34))
+      
+  gl.cors <- c(gl.cors,cor(gl.preds,fam.phenos$Volume))
+  gl.rmse <- c(gl.rmse, rmse(gl.preds,fam.phenos$Volume))
+}
+gl.cors1 <- gl.cors
+gl.rmse1 <- gl.rmse
+plot(alpha.set,gl.cors)
+```
+
+```{r load.1}
+load(file="/mnt/LOO_prediction_files/LOO_pred.snpsv2.RData")
+```
+
+Try on adjusted pvals
+
+* Do the same for the adjusted p-values with the expectation the we will also test 3 different alpha's: 1,0,.5
+
+```{r}
+all.gg <- cbind(gl.cors2,gl.cors3,gl.cors4)
+all.gg.melt <- melt(data = all.gg,id="method")
+#all.gg.melt[,1] <- all.gg.melt[,1]/100
+colnames(all.gg.melt) <- c("weight","method","cor")
+
+ggplot(data = all.gg.melt,aes(x=cor,y=weight,colour=as.factor(method))) +
+  geom_point() + labs(x="Predicted BV vs. True BV correlation (r)",y="Pvalue threshold used",color="Model") + ggtitle(paste0("LOO prediction vs. test correlations across pvalue thresholds using \n GLMNET")) 
+```
+
+```{r adjusted.pva, eval=FALSE, include=FALSE}
+p.val.subset <- seq(to = .1,from = .01,by = .001);
+# ALPHA = 1 Try on adjusted pvals ####
+gl.cors <- c() ; gl.rmse <- c()
+for(each in 1:length(p.val.subset)){
+  this.pval <- p.val.subset[each]
+  
+        gl.preds <- unlist(mclapply(1:length(u.fams),function(each.fam){
+            gl.mod <- glmnet(x = fam.012.df[-each.fam,which(family_anova_padjust[[each.fam]] <= this.pval)],
+                  y = fam.phenos$Volume[-each.fam],alpha = 1,standardize = F) 
+            predictions <- predict.glmnet(gl.mod,newx = fam.012.df[,which(family_anova_padjust[[each.fam]] <= this.pval)])
+            predictions[each.fam,ncol(predictions)] 
+            },mc.cores=34))
+
+  gl.cors <- c(gl.cors,cor(gl.preds,fam.phenos$Volume))
+  gl.rmse <- c(gl.rmse, rmse(gl.preds,fam.phenos$Volume))
+}
+gl.cors2 <- gl.cors
+gl.rmse2 <- gl.rmse
+plot(p.val.subset,gl.cors)
+
+# ALPHA = 0 ####
+gl.cors <- c() ; gl.rmse <- c()
+for(each in 1:length(p.val.subset)){
+  this.pval <- p.val.subset[each]
+  
+        gl.preds <- unlist(mclapply(1:length(u.fams),function(each.fam){
+            gl.mod <- glmnet(x = fam.012.df[-each.fam,which(family_anova_padjust[[each.fam]] <= this.pval)],
+                  y = fam.phenos$Volume[-each.fam],alpha = 0,standardize = F) 
+            predictions <- predict.glmnet(gl.mod,newx = fam.012.df[,which(family_anova_padjust[[each.fam]] <= this.pval)])
+            predictions[each.fam,ncol(predictions)] 
+            },mc.cores=34))
+
+  gl.cors <- c(gl.cors,cor(gl.preds,fam.phenos$Volume))
+  gl.rmse <- c(gl.rmse, rmse(gl.preds,fam.phenos$Volume))
+}
+gl.cors3 <- gl.cors
+gl.rmse3 <- gl.rmse
+plot(p.val.subset,gl.cors)
+
+# ALPHA = 0.5 ####
+gl.cors <- c() ; gl.rmse <- c()
+for(each in 1:length(p.val.subset)){
+  this.pval <- p.val.subset[each]
+  
+        gl.preds <- unlist(mclapply(1:length(u.fams),function(each.fam){
+            gl.mod <- glmnet(x = fam.012.df[-each.fam,which(family_anova_padjust[[each.fam]] <= this.pval)],
+                  y = fam.phenos$Volume[-each.fam],alpha = .5,standardize = F) 
+            predictions <- predict.glmnet(gl.mod,newx = fam.012.df[,which(family_anova_padjust[[each.fam]] <= this.pval)])
+            predictions[each.fam,ncol(predictions)] 
+            },mc.cores=34))
+
+  gl.cors <- c(gl.cors,cor(gl.preds,fam.phenos$Volume))
+  gl.rmse <- c(gl.rmse, rmse(gl.preds,fam.phenos$Volume))
+}
+gl.cors4 <- gl.cors
+gl.rmse4 <- gl.rmse
+plot(p.val.subset,gl.cors)
+```
+
+## Save image
+
+```{r save}
+#save.image(file="./LOO_pred.snpsv2.RData",compress=T)
+```

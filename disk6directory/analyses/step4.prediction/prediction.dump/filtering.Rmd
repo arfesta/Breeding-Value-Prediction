@@ -1,0 +1,222 @@
+---
+title: "SNP filtering"
+author: "Adam Festa"
+date: "6/8/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Objective
+
+The SNPs used here were processed according [this file](https://github.com/arfesta/Breeding-Value-Prediction/tree/master/disk6directory/snps) and were downloaded locally for filtering and prediction.
+
+We will follow slighlty along with this [SNP filtering tutorial](http://ddocent.com/filtering/) to test out different filters. Ultimately, the objective is two-fold:
+
+  * Subset a set of snps which provide good prediction from a relationship matrix
+  * Subset a set of SNPs which may not provide highest accuracy but will allow feature selection more opportunity to select the right SNPs for prediction
+
+## Script setup
+
+Set the working directory to the location where the snps were downloaded.
+
+```
+setwd("~/Documents/Grad_Projects/BV_Prediction/mnt/media/disk6/ARF/shared/snps")
+#Create direcotry to hold relationship matrices
+system("mkdir relmats")
+system("mkdir 012")
+```
+
+## Calculate stats on complete vcf
+
+The below code generates stats on the complete vcf file.
+
+```
+system("bcftools stats 192.biorep.vcf.bgzip.gz > complete.stats")
+system("plot-vcfstats file.vchk -p plots/")
+```
+
+Output indicates 1,974,852 total SNPs of which 45,562 are multi-allelic.
+
+## ** Create relationship matrix from the complete data
+
+VCFTools can be used to generate a relationship matrix. (Only uses bi-allelic SNPs)
+
+```
+system("vcftools --gzvcf 192.biorep.vcf.bgzip.gz --relatedness2")
+system("mv out.relatedness2 ./relmats/complete.relatedness2")
+```
+
+## Filter SNP < Q30 lower quality
+
+* Set the threshold of SNPs to be Q=30
+
+```
+system("vcftools --gzvcf 192.biorep.vcf.bgzip.gz --minQ 30 --recode --recode-INFO-all --stdout | gzip -c > 192.biorep.Q30.vcf.bgzip.gz")
+
+After filtering, kept 1,175,244 out of a possible 2,269,592 Sites (including the MNPs and indels)
+```
+
+## Remove indels
+
+* Use vcftools to output snps only
+
+```
+system("vcftools --gzvcf 192.biorep.Q30.vcf.bgzip.gz --remove-indels --recode --recode-INFO-all --stdout | gzip -c > 192.biorep.Q30.snps.vcf.bgzip.gz")
+
+After filtering, kept 979,862 out of a possible 1,175,244 Sites
+```
+
+## Check samples which are missing a certain % of loci
+
+* Lets see how the % of sites missing from individuals with at sites with a minimum of Q30 and no indels
+
+```
+system("vcftools --gzvcf 192.biorep.Q30.snps.vcf.bgzip.gz --missing-indv")
+system("cat out.imiss")
+```
+
+The output indicates that LGEP samples are missing ~20% of sites on average while the EW samples are missing ~40%
+
+
+## Remove missing data
+
+* No missing data
+
+```
+system("vcftools --gzvcf 192.biorep.Q30.snps.vcf.bgzip.gz --max-missing 1 --recode --recode-INFO-all --stdout | gzip -c > 192.biorep.Q30.snps.nomiss.vcf.bgzip.gz")
+
+After filtering, kept 274544 out of a possible 979862 Sites
+```
+
+## Check again to see % missing
+
+```
+system("vcftools --gzvcf 192.biorep.Q30.snps.nomiss.vcf.bgzip.gz --missing-indv")
+system("cat out.imiss")
+```
+Every sample has a SNP at 274K sites with a mininum of 30 quality
+
+## ** Create relationship matrix and 012 output
+
+Before applying additional filters we can write these two out to test with omic kriging
+
+```
+system("vcftools --gzvcf 192.biorep.Q30.snps.nomiss.vcf.bgzip.gz --relatedness2")
+system("mv out.relatedness2 ./relmats/Q30.snps.nomiss.relatedness2")
+system("vcftools --gzvcf 192.biorep.Q30.snps.nomiss.vcf.bgzip.gz --012")
+system("mv out.012 ./012/Q30.snps.nomiss.012")
+system("mv out.012.pos ./012/Q30.snps.nomiss.012.pos")
+system("mv out.012.indv ./012/Q30.snps.nomiss.012.indv")
+```
+
+
+
+## Remove snps which have < .05 maf
+
+* SNPs with low maf may be unrelaible for the purpose of prediction.  Let's remove those.
+
+```
+system("vcftools --gzvcf 192.biorep.Q30.snps.nomiss.vcf.bgzip.gz --maf .05 --recode --recode-INFO-all --stdout | gzip -c > 192.biorep.Q30.snps.nomiss.maf05.vcf.bgzip.gz")
+
+After filtering, kept 141,456 out of a possible 274,544 Sites
+```
+
+* About 130K SNPs have less than .05 maf
+
+## ** Create relationship matrix and 012 output
+
+Before applying additional filters we can write these two out to test with omic kriging
+
+```
+system("vcftools --gzvcf ./vcfs/192.biorep.Q30.snps.nomiss.maf05.vcf.bgzip.gz --relatedness2")
+system("mv out.relatedness2 ./relmats/Q30.snps.nomiss.maf05.relatedness2")
+system("vcftools --gzvcf ./vcfs/192.biorep.Q30.snps.nomiss.maf05.vcf.bgzip.gz --012")
+system("mv out.012 ./012/Q30.snps.nomiss.maf05.012")
+system("mv out.012.pos ./012/Q30.snps.nomiss.maf05.012.pos")
+system("mv out.012.indv ./012/Q30.snps.nomiss.maf05.012.indv")
+```
+
+## Remove sites with a low depth
+
+* Sites with low depth have a low number of observations.  Let's filter those out.
+
+```
+system("vcftools --gzvcf ./vcfs/192.biorep.Q30.snps.nomiss.maf05.vcf.bgzip.gz --min-meanDP 20 --recode --recode-INFO-all --stdout | bgzip -c > 192.biorep.Q30.snps.nomiss.maf05.mindp20.vcf.bgzip.gz")
+
+After filtering, kept 59,390 out of a possible 141,456 Sites
+```
+
+* Close to 90K snps had low depth
+
+
+
+## Create relationship matrix and 012 output
+
+Write out the filtered vcf to test with omic kriging
+
+```
+system("vcftools --gzvcf 192.biorep.Q30.snps.nomiss.maf05.mindp20.vcf.bgzip.gz --relatedness2")
+system("mv out.relatedness2 ./relmats/Q30.snps.nomiss.maf05.mindp20.relatedness2")
+system("vcftools --gzvcf 192.biorep.Q30.snps.nomiss.maf05.mindp20.vcf.bgzip.gz --012")
+system("mv out.012 ./012/Q30.snps.nomiss.maf05.mindp20.012")
+system("mv out.012.pos ./012/Q30.snps.nomiss.maf05.mindp20.012.pos")
+system("mv out.012.indv ./012/Q30.snps.nomiss.maf05.mindp20.012.indv")
+```
+
+## Move all vcfs to a separate folder
+
+```
+system("mkdir vcfs")
+system("mv 192.biorep.Q30.vcf.bgzip.gz ./vcfs/")
+system("mv 192.biorep.Q30.snps.vcf.bgzip.gz ./vcfs/")
+system("mv 192.biorep.Q30.snps.nomiss.vcf.bgzip.gz ./vcfs/")
+system("mv 192.biorep.Q30.snps.nomiss.maf05.vcf.bgzip.gz ./vcfs/")
+system("mv 192.biorep.Q30.snps.nomiss.maf05.mindp20.vcf.bgzip.gz ./vcfs/")
+```
+## Test depth by qual
+system("tabix 192.biorep.Q30.snps.nomiss.maf05.mindp20.vcf.bgzip.gz")
+system("vcffilter -f 'QUAL / DP > 2' 192.biorep.Q30.snps.nomiss.maf05.mindp20.vcf.bgzip.gz > DP3g95p5maf05.fil5.vcf")
+
+system("mawk '!/#/' DP3g95p5maf05.fil5.vcf | wc -l")
+
+system("vcftools --vcf DP3g95p5maf05.fil5.vcf --relatedness2")
+
+## Test snp thinning
+
+* SNPs which are close to one another are likely to be in ld, lets try to thin those SNPs
+
+```
+system("vcftools --gzvcf ./vcfs/192.biorep.Q30.snps.nomiss.maf05.mindp20.vcf.bgzip.gz --thin 30 --recode --recode-INFO-all --stdout | bgzip -c > 192.biorep.Q30.snps.nomiss.maf05.mindp20.thin30.vcf.bgzip.gz")
+After filtering, kept 46008 out of a possible 59390 Sites
+```
+
+system("tabix 192.biorep.Q30.snps.nomiss.maf05.mindp20.thin30.vcf.bgzip.gz")
+system("vcffilter -f 'QUAL / DP > 0.25' 192.biorep.Q30.snps.nomiss.maf05.mindp20.thin30.vcf.bgzip.gz > 192.biorep.Q30.snps.nomiss.maf05.mindp20.thin30dp.ratio.vcf")
+
+system("mawk '!/#/' 192.biorep.Q30.snps.nomiss.maf05.mindp20.thin30dp.ratio.vcf | wc -l")
+
+system("vcftools --vcf 192.biorep.Q30.snps.nomiss.maf05.mindp20.thin30dp.ratio.vcf --relatedness2")
+
+
+## Add additional filters
+
+* Additional filters include:
+
+    * Subsetting based on the non reference alternative allele frequency
+    * Thin SNPs based on closeness
+    
+### Apply a non-ref-alt allele frequency max/min
+  
+```
+system("vcftools --gzvcf 192.nomissing.snpsonly.mac3.vcf.gz --non-ref-af .05 --max-non-ref-af .75 --recode --recode-INFO-all --stdout | gzip -c > 192.nomissing.snpsonly.mac3.min05.max3vcf.gz")
+
+After filtering, kept 107,039 out of a possible 266,224 Sites
+
+system("vcftools --gzvcf 192.nomissing.snpsonly.mac3.min05.max3vcf.gz --relatedness2")
+
+system("vcftools --gzvcf 192.nomissing.snpsonly.mac3.min05.max3vcf.gz --012")
+
+```
