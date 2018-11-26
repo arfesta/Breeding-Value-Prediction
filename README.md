@@ -9,7 +9,7 @@
   * [Analyses](#analyses)
     + [Step 1 - Data Prep](#step-1---data-prep)
     + [Step 2 - Load Count Data](#step-2---load-count-data)
-    + [Step 3 - Normalization](#step-3---normalization)
+    + [Step 3 - Normalization and SNP filtering](#step-3---normalization-and-snp-filtering)
     + [Step 4 - Prediction](#step-4---prediction)
 
 ## Abstract
@@ -72,7 +72,7 @@ Data Subject Type | Data File Type | Path | Notes
 
    To see this process for **technical reps**, navigate to: [load counts tech rep html file](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step2.loadcounts/load.counts_techreps.html) which contains the complete markdown and output.
 
-### Step 3 - Normalization
+### Step 3 - Normalization and SNP filtering
 
 The counts were normarlized *multiple* ways, however only the #1 was used for prediction:
 
