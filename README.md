@@ -9,7 +9,7 @@
   * [Analyses](#analyses)
     + [Step 1 - Data Prep](#step-1---data-prep)
     + [Step 2 - Load Count Data](#step-2---load-count-data)
-    + [Step 3 - Normalization and SNP filtering](#step-3---normalization-and-snp-filtering)
+    + [Step 3 - Transcript normalization and SNP filtering](#step-3---transcript-normalization-and-snp-filtering)
     + [Step 4 - Prediction](#step-4---prediction)
 
 ## Abstract
@@ -72,13 +72,15 @@ Data Subject Type | Data File Type | Path | Notes
 
    To see this process for **technical reps**, navigate to: [load counts tech rep html file](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step2.loadcounts/load.counts_techreps.html) which contains the complete markdown and output.
 
-### Step 3 - Normalization and SNP filtering
+### Step 3 - Transcript normalization and SNP filtering
 
 The counts were normarlized *multiple* ways, however only the #1 was used for prediction:
 
   1.  Using **techincal replicate** counts and asreml to normalize for batch, index, lane, and pedigree: [markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step3.normalization/Step3_LMM_animal.html)
   
   2.  Using DESEQ2, edgeR, sommer in bio and tech see repo
+  
+  3. SNP's were filtered multiple ways: [markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step3.normalization/snp_filtering.html)
   
 
 ### Step 4 - Prediction
