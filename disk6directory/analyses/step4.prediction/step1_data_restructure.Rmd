@@ -1,0 +1,181 @@
+---
+title: "Data Restructure"
+author: "Adam Festa"
+date: "11/27/2018"
+output: 
+  html_document: 
+    theme: flatly
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose
+
+The purpose of this script is to take the data that was produced by normalization & SNP filtering to match to the phenotypes so that all are in same order.  Additionally, the crossover families are identified and family mean data sets are generated.
+
+* Script was ran on local computer, but all files are on titan
+
+## Load SNPs, Transcripts & Phenos
+
+* Loads 192x46407 SNPs identified by snpEff and specify row/column names
+
+```{r load.snps}
+library(parallel)
+snps <- read.table("../../../shared/192.biorep.Q30.snps.no.miss.maf05.ann.high.mod.012",row.names = 1)
+rownames(snps) <- read.table("../../../shared/192.biorep.Q30.snps.no.miss.maf05.ann.high.mod.012.indv")[,1]
+colnames(snps) <- paste0(read.table("../../../shared/192.biorep.Q30.snps.no.miss.maf05.ann.high.mod.012.pos")[,1],
+                         "_",
+                         read.table("../../../shared/192.biorep.Q30.snps.no.miss.maf05.ann.high.mod.012.pos")[,2])
+```
+
+* Fix the SNP rownames:
+
+```{r fix.snp.names}
+head(rownames(snps))
+this <- gsub("[^0-9\\.]", "", rownames(snps))
+this <- gsub("\\.","",this)
+this <- as.numeric(this)
+this[1:48] <- this[1:48] + 1000
+rownames(snps) <- this ; rm(this)
+head(rownames(snps))
+```
+
+* Loads trancript normalization returned from asreml
+
+```{r load.txpts}
+load("../../../shared/Step3_LMM_animal.RData")
+```
+
+* The rownames need to be fixed:
+
+```{r fix.txpt.names}
+head(rownames(asreml.counts))
+rownames(asreml.counts) <- gsub(pattern = "ped\\(animal_id, var = T)_",replacement = "",x = rownames(asreml.counts))
+head(rownames(asreml.counts))
+asreml.counts <- asreml.counts[-c(1:94),]
+```
+
+* Load all phenos (tech reps)
+
+```{r load.phenos}
+load("../../../disk6directory/resources/expt.dat.720.RData")
+```
+
+## Consolidate phenos to bioliogical reps
+
+* Reduce the tech reps phenos to only include bio rep entries found in SNPs/transcripts
+
+```{r reduce.phenos}
+# Find column names
+#colnames(expt.dat.720)
+# unique set of animal_id, fam_id, Volume, & Height
+bio.phenos <- unique(expt.dat.720[,c(1,2,13,17)])
+
+# subset phenos to only include entries which passed transcript qc
+bio.phenos <- bio.phenos[which(as.character(bio.phenos$animal_id) %in% rownames(asreml.counts)),]
+
+# remove missing phenotypes
+bio.phenos <- bio.phenos[-c(which(is.na(bio.phenos$Volume) == T)),]
+
+# Reduce snps to only include those with phenotypes 
+snps <- snps[which(rownames(snps) %in% as.character(bio.phenos$animal_id)),]
+dim(snps)
+# 189 x 46047
+
+# Reduce phenos to only include those within snps
+bio.phenos <- bio.phenos[which(as.character(bio.phenos$animal_id) %in% rownames(snps)),]
+dim(bio.phenos)
+#189x4
+
+# Reduce transcripts to include those within phenos
+asreml.counts <- asreml.counts[which(rownames(asreml.counts) %in% bio.phenos$animal_id),]
+dim(asreml.counts)
+#189x70109
+```
+
+## Match all data sets
+
+* Identify the order of the bio.phenos object and match bio counts and snps to that order
+
+```{r match.order}
+# Match txpt rownames to bio.phenos
+this.order <- match(as.character(bio.phenos$animal_id),rownames(asreml.counts))
+identical(rownames(asreml.counts)[this.order],as.character(bio.phenos$animal_id))
+#TRUE
+asreml.counts <- asreml.counts[this.order,]
+
+# Match snps rownames to bio.phenos
+this.order <- match(as.character(bio.phenos$animal_id),rownames(snps))
+identical(rownames(snps)[this.order],as.character(bio.phenos$animal_id))
+#TRUE
+snps <- snps[this.order,]
+rm(this.order)
+```
+
+## Obtain family level data
+
+* Generate family-mean level phenotypes, transcript counts, & SNPs
+
+```{r fam.means}
+# Fam phenos will be the unique of fam_id, Volume, Height
+fam.phenos <- unique(bio.phenos[,-1])
+rownames(fam.phenos) <- fam.phenos$fam_id
+
+# Consolidate bio transcripts
+fam.counts <- mclapply(1:56,function(each.fam){
+  these.rows <- which(as.character(bio.phenos$fam_id) %in% rownames(fam.phenos))
+  apply(asreml.counts[these.rows,],2,mean)
+},mc.cores=8)
+fam.counts <- do.call(rbind,fam.counts)
+rownames(fam.counts) <- fam.phenos$fam_id
+dim(fam.counts)
+#56 70109
+
+# Consolidate bio SNPs
+fam.snps <- mclapply(1:56,function(each.fam){
+  these.rows <- which(as.character(bio.phenos$fam_id) %in% rownames(fam.phenos))
+  apply(snps[these.rows,],2,mean)
+},mc.cores=8)
+fam.snps <- do.call(rbind,fam.snps)
+rownames(fam.snps) <- fam.phenos$fam_id
+dim(fam.snps)
+#56 46407
+```
+
+## Identify crossover families between LGEP & EW
+
+* Find the families which were grown in both batches
+```{r crossover.fams}
+crossover.fam.table <- unique(expt.dat.720[,c(2,5,17)])
+crossover.fam.table <- crossover.fam.table[which(as.character(crossover.fam.table$fam_id) %in% rownames(fam.phenos)),]
+crossover.fams <- table(as.character(crossover.fam.table$fam_id))
+crossover.fams <- names(crossover.fams)[which(crossover.fams == 2)]
+crossover.fams
+```
+
+* Find the EW families
+
+```{r ew.fams}
+ew.fams <- as.character(crossover.fam.table$fam_id[which(as.character(crossover.fam.table$batch) %in% "EW")])
+ew.fams <- ew.fams[-which(ew.fams %in% crossover.fams)]
+rm(crossover.fam.table)
+ew.fams
+lgep.fams <- as.character(fam.phenos$fam_id[-which(fam.phenos$fam_id %in% ew.fams)])
+```
+
+## Save all data in shared directory
+
+* Create a list of all data objects and save
+
+```{r save}
+ordered.data <- list("bio.counts"=asreml.counts,"bio.snps"=snps,"bio.phenos"=bio.phenos,"fam.counts"=fam.counts,"fam.snps"=fam.snps,"fam.phenos"=fam.phenos,
+     "ew.fams"=ew.fams,"lgep.fams"=lgep.fams,"crossover.fams"=crossover.fams)
+
+save(ordered.data,file = "../../../shared/ordered.data.RData",compress = T)
+```
+
+
+
