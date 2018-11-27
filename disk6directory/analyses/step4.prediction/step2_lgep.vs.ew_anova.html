@@ -188,7 +188,7 @@ hist(fdr.snp.pvals,main = &quot;FDR adjusted SNP p-vals LGEP&quot;)</code></pre>
 <ul>
 <li>Prediction will be done on family-mean values, so create test/train on family mean objects</li>
 </ul>
-<pre class="r"><code>rm.ew.fams &lt;- which(ordered.data$fam.phenos$fam_id %in% ordered.data$ew.fams)
+<pre class="r"><code>rm.ew.fams &lt;- which(as.character(ordered.data$fam.phenos$fam_id) %in% ordered.data$ew.fams)
 train.lgep.counts &lt;- ordered.data$fam.counts[-rm.ew.fams,]
 train.lgep.snps &lt;- ordered.data$fam.snps[-rm.ew.fams,]
 train.lgep.phenos &lt;- ordered.data$fam.phenos[-rm.ew.fams,]

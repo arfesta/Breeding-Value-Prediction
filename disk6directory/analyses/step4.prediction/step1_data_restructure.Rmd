@@ -6,6 +6,8 @@ output:
   html_document: 
     theme: flatly
     toc: yes
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -64,7 +66,7 @@ asreml.counts <- asreml.counts[-c(1:94),]
 load("../../../disk6directory/resources/expt.dat.720.RData")
 ```
 
-## Consolidate phenos to bioliogical reps
+## Consolidate phenos to biological reps
 
 * Reduce the tech reps phenos to only include bio rep entries found in SNPs/transcripts
 
@@ -126,8 +128,11 @@ rownames(fam.phenos) <- fam.phenos$fam_id
 
 # Consolidate bio transcripts
 fam.counts <- mclapply(1:56,function(each.fam){
-  these.rows <- which(as.character(bio.phenos$fam_id) %in% rownames(fam.phenos))
-  apply(asreml.counts[these.rows,],2,mean)
+  these.rows <- which(as.character(bio.phenos$fam_id) %in% rownames(fam.phenos)[each.fam])
+  if(length(these.rows) > 1){
+  apply(asreml.counts[these.rows,],2,mean)} else {
+    asreml.counts[these.rows,]
+  }
 },mc.cores=8)
 fam.counts <- do.call(rbind,fam.counts)
 rownames(fam.counts) <- fam.phenos$fam_id
@@ -136,8 +141,11 @@ dim(fam.counts)
 
 # Consolidate bio SNPs
 fam.snps <- mclapply(1:56,function(each.fam){
-  these.rows <- which(as.character(bio.phenos$fam_id) %in% rownames(fam.phenos))
-  apply(snps[these.rows,],2,mean)
+  these.rows <- which(as.character(bio.phenos$fam_id) %in% rownames(fam.phenos)[each.fam])
+  if(length(these.rows) > 1){
+  apply(snps[these.rows,],2,mean)} else {
+    snps[these.rows,]
+  }
 },mc.cores=8)
 fam.snps <- do.call(rbind,fam.snps)
 rownames(fam.snps) <- fam.phenos$fam_id

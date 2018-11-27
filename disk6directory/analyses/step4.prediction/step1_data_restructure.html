@@ -132,7 +132,7 @@ $(document).ready(function () {
 <ul>
 <li><a href="#purpose">Purpose</a></li>
 <li><a href="#load-snps-transcripts-phenos">Load SNPs, Transcripts &amp; Phenos</a></li>
-<li><a href="#consolidate-phenos-to-bioliogical-reps">Consolidate phenos to bioliogical reps</a></li>
+<li><a href="#consolidate-phenos-to-biological-reps">Consolidate phenos to biological reps</a></li>
 <li><a href="#match-all-data-sets">Match all data sets</a></li>
 <li><a href="#obtain-family-level-data">Obtain family level data</a></li>
 <li><a href="#identify-crossover-families-between-lgep-ew">Identify crossover families between LGEP &amp; EW</a></li>
@@ -192,8 +192,8 @@ head(rownames(asreml.counts))</code></pre>
 </ul>
 <pre class="r"><code>load(&quot;../../../disk6directory/resources/expt.dat.720.RData&quot;)</code></pre>
 </div>
-<div id="consolidate-phenos-to-bioliogical-reps" class="section level2">
-<h2>Consolidate phenos to bioliogical reps</h2>
+<div id="consolidate-phenos-to-biological-reps" class="section level2">
+<h2>Consolidate phenos to biological reps</h2>
 <ul>
 <li>Reduce the tech reps phenos to only include bio rep entries found in SNPs/transcripts</li>
 </ul>
@@ -257,8 +257,11 @@ rownames(fam.phenos) &lt;- fam.phenos$fam_id
 
 # Consolidate bio transcripts
 fam.counts &lt;- mclapply(1:56,function(each.fam){
-  these.rows &lt;- which(as.character(bio.phenos$fam_id) %in% rownames(fam.phenos))
-  apply(asreml.counts[these.rows,],2,mean)
+  these.rows &lt;- which(as.character(bio.phenos$fam_id) %in% rownames(fam.phenos)[each.fam])
+  if(length(these.rows) &gt; 1){
+  apply(asreml.counts[these.rows,],2,mean)} else {
+    asreml.counts[these.rows,]
+  }
 },mc.cores=8)
 fam.counts &lt;- do.call(rbind,fam.counts)
 rownames(fam.counts) &lt;- fam.phenos$fam_id
@@ -268,8 +271,11 @@ dim(fam.counts)</code></pre>
 
 # Consolidate bio SNPs
 fam.snps &lt;- mclapply(1:56,function(each.fam){
-  these.rows &lt;- which(as.character(bio.phenos$fam_id) %in% rownames(fam.phenos))
-  apply(snps[these.rows,],2,mean)
+  these.rows &lt;- which(as.character(bio.phenos$fam_id) %in% rownames(fam.phenos)[each.fam])
+  if(length(these.rows) &gt; 1){
+  apply(snps[these.rows,],2,mean)} else {
+    snps[these.rows,]
+  }
 },mc.cores=8)
 fam.snps &lt;- do.call(rbind,fam.snps)
 rownames(fam.snps) &lt;- fam.phenos$fam_id
