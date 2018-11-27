@@ -200,7 +200,7 @@ head(rownames(asreml.counts))</code></pre>
 <pre class="r"><code># Find column names
 #colnames(expt.dat.720)
 # unique set of animal_id, fam_id, Volume, &amp; Height
-bio.phenos &lt;- unique(expt.dat.720[,c(1,2,13,17)])
+bio.phenos &lt;- unique(expt.dat.720[,c(1,2,13,17,18)])
 
 # subset phenos to only include entries which passed transcript qc
 bio.phenos &lt;- bio.phenos[which(as.character(bio.phenos$animal_id) %in% rownames(asreml.counts)),]
@@ -217,7 +217,7 @@ dim(snps)</code></pre>
 # Reduce phenos to only include those within snps
 bio.phenos &lt;- bio.phenos[which(as.character(bio.phenos$animal_id) %in% rownames(snps)),]
 dim(bio.phenos)</code></pre>
-<pre><code>## [1] 189   4</code></pre>
+<pre><code>## [1] 189   5</code></pre>
 <pre class="r"><code>#189x4
 
 # Reduce transcripts to include those within phenos

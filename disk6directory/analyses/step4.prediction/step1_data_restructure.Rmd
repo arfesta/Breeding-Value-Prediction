@@ -74,7 +74,7 @@ load("../../../disk6directory/resources/expt.dat.720.RData")
 # Find column names
 #colnames(expt.dat.720)
 # unique set of animal_id, fam_id, Volume, & Height
-bio.phenos <- unique(expt.dat.720[,c(1,2,13,17)])
+bio.phenos <- unique(expt.dat.720[,c(1,2,13,17,18)])
 
 # subset phenos to only include entries which passed transcript qc
 bio.phenos <- bio.phenos[which(as.character(bio.phenos$animal_id) %in% rownames(asreml.counts)),]

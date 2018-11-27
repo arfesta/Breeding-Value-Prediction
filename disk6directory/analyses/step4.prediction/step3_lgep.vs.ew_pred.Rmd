@@ -1,0 +1,184 @@
+---
+title: "LGEP vs. EW Prediction"
+author: "Adam Festa"
+date: "11/27/2018"
+output: html_document
+---
+
+## Purpose
+
+The purpose of this script is to conduct predictions with ridge, lasso, and OmicKriging on the EW families using the LGEP families
+
+## Load starting data
+
+* Load the LGEP vs EW data & R packages
+
+```{r load.data}
+library(glmnet); library(doParallel); library(ggplot2)
+library(ggpubr); library(OmicKriging); library(caret)
+load("~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/lgep.vs.ew.data.RData")
+names(lgep.vs.ew.data)
+```
+
+* Specify fdr p-values to test and register cores
+
+```{r pvals}
+pvals <- c(.01,.05,.1,.15,.2,.25,.3,1)
+registerDoParallel(cores=8)
+```
+
+## Ridge/Lasso/OK
+
+* For each p-value subset, we run cv.glmnet to determine lambda for lasso and ridge, then predict on EW families using the minimum lambda value.
+
+* Resulting output is predictions at each p-value using txpts, snps, or txpts + snps with ridge/lasso.  Additionally, features which were used in lasso model are stored in list output
+
+```{r ridge.lasso}
+pt <- proc.time()
+lgep.vs.ew.ridge.lasso.ok <- lapply(1:8,function(each){
+  # First transcripts ridge/lasso
+pval.train <- lgep.vs.ew.data$train.counts[,which(lgep.vs.ew.data$fdr.counts < pvals[each])]
+pval.test <- lgep.vs.ew.data$test.counts[,which(lgep.vs.ew.data$fdr.counts < pvals[each])]
+lasso.cv <- cv.glmnet(x = pval.train,y = lgep.vs.ew.data$train.phenos$Volume,parallel = T,alpha=1,nfolds = 45,grouped = F,standardize=F)
+txpt.lasso.pred <- predict.cv.glmnet(object = lasso.cv,newx = pval.test,s = lasso.cv$lambda.min)
+txpt.lasso.features <- colnames(pval.train)[which(coef.cv.glmnet(lasso.cv,s = lasso.cv$lambda.min) != 0)]
+
+ridge.cv <- cv.glmnet(x = pval.train,y = lgep.vs.ew.data$train.phenos$Volume,parallel = T,alpha=0,nfolds = 45,grouped = F,standardize=F)
+txpt.ridge.pred <- predict.cv.glmnet(object = ridge.cv,newx = pval.test,s = lasso.cv$lambda.min)
+
+# transcripts OK
+x.train <- cor(t(pval.train))
+y.train <- lgep.vs.ew.data$train.phenos
+all.weights <- seq(.1,1,.1)
+
+train.rmse <- unlist(lapply(1:length(all.weights),function(each.weight){
+  this.w <- all.weights[each.weight]
+  ok.preds <- lapply(1:nrow(y.train),function(each.cv){
+    ok.pred <- okriging(idtest = y.train$fam_id[each.cv],idtrain = y.train$fam_id[-each.cv],corlist = list(x.train),H2vec = c(this.w),pheno = y.train,phenoname = "Volume")
+  })
+  ok.preds <-do.call(rbind,ok.preds)
+  RMSE(ok.preds[,2],ok.preds[,3])
+}))
+
+final.weight <- all.weights[which.min(train.rmse)]
+all.d <- rbind(pval.train,pval.test)
+all.p <- rbind(y.train,lgep.vs.ew.data$test.phenos)
+x.cor <- cor(t(all.d))
+ok.pred <- okriging(idtest = lgep.vs.ew.data$test.phenos$fam_id,idtrain = lgep.vs.ew.data$train.phenos$fam_id,corlist = list(x.cor),H2vec = c(final.weight),pheno = all.p ,phenoname = "Volume")
+txpt.ok.pred <- ok.pred[,-c(1)]
+
+ # Next snps ridge/lasso
+pval.train <- as.matrix(lgep.vs.ew.data$train.snps[,which(lgep.vs.ew.data$fdr.snps < pvals[each])])
+pval.test <- as.matrix(lgep.vs.ew.data$test.snps[,which(lgep.vs.ew.data$fdr.snps < pvals[each])])
+lasso.cv <- cv.glmnet(x = pval.train,y = lgep.vs.ew.data$train.phenos$Volume,parallel = T,alpha=1,nfolds = 45,grouped = F,standardize=F)
+snp.lasso.pred <- predict.cv.glmnet(object = lasso.cv,newx = pval.test,s = lasso.cv$lambda.min)
+snp.lasso.features <- colnames(pval.train)[which(coef.cv.glmnet(lasso.cv,s = lasso.cv$lambda.min) != 0)]
+
+ridge.cv <- cv.glmnet(x = pval.train,y = lgep.vs.ew.data$train.phenos$Volume,parallel = T,alpha=0,nfolds = 45,grouped = F,standardize=F)
+snp.ridge.pred <- predict.cv.glmnet(object = ridge.cv,newx = pval.test,s = lasso.cv$lambda.min)
+
+# snps OK
+x.train <- cor(t(pval.train))
+y.train <- lgep.vs.ew.data$train.phenos
+all.weights <- seq(.1,1,.1)
+
+train.rmse <- unlist(lapply(1:length(all.weights),function(each.weight){
+  this.w <- all.weights[each.weight]
+  ok.preds <- lapply(1:nrow(y.train),function(each.cv){
+    ok.pred <- okriging(idtest = y.train$fam_id[each.cv],idtrain = y.train$fam_id[-each.cv],corlist = list(x.train),H2vec = c(this.w),pheno = y.train,phenoname = "Volume")
+  })
+  ok.preds <-do.call(rbind,ok.preds)
+  RMSE(ok.preds[,2],ok.preds[,3])
+}))
+
+final.weight <- all.weights[which.min(train.rmse)]
+all.d <- rbind(pval.train,pval.test)
+all.p <- rbind(y.train,lgep.vs.ew.data$test.phenos)
+x.cor <- cor(t(all.d))
+ok.pred <- okriging(idtest = lgep.vs.ew.data$test.phenos$fam_id,idtrain = lgep.vs.ew.data$train.phenos$fam_id,corlist = list(x.cor),H2vec = c(final.weight),pheno = all.p ,phenoname = "Volume")
+snp.ok.pred <- ok.pred[,-1]
+
+both.ridge.pred <- (txpt.ridge.pred + snp.ridge.pred)/2
+both.lasso.pred <- (txpt.lasso.pred + snp.lasso.pred)/2
+both.ok.pred <- (txpt.ok.pred + snp.ok.pred)/2
+
+prediction.ridge <- data.frame("txpts"=txpt.ridge.pred,"snps"=snp.ridge.pred,"txpts.snps"=both.ridge.pred)
+colnames(prediction.ridge) <- c("txpts","snps","txpts.snps")
+prediction.lasso <- data.frame("txpts"=txpt.lasso.pred,"snps"=snp.lasso.pred,"txpts.snps"=both.lasso.pred)
+colnames(prediction.lasso) <- c("txpts","snps","txpts.snps")
+prediction.ok <- data.frame("txpts"=txpt.ok.pred[,-2],"snps"=snp.ok.pred[,-2],"txpts.snps"=both.ok.pred[,-2])
+colnames(prediction.ok) <- c("txpts","snps","txpts.snps")
+
+lasso.features <- list("txpts"=txpt.lasso.features,"snps"=snp.lasso.features)
+
+results <- list("ridge"=prediction.ridge,"lasso"=prediction.lasso,"ok"=prediction.ok,"lasso.feats"=lasso.features)
+})
+proc.time()-pt
+```
+
+* Save output
+
+```{r save}
+save(lgep.vs.ew.ridge.lasso.ok,file = "~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/lgep.vs.ew.ridge.lasso.ok.RData",compress=T)
+```
+
+
+## Gather results
+
+* Gather the correlation for each model/pval
+
+```{r cor}
+ridge.cors <- do.call(rbind,lapply(lgep.vs.ew.ridge.lasso.ok,function(x){
+  apply(x$ridge,2,function(z) cor(z,lgep.vs.ew.data$test.phenos$Volume))
+}))
+lasso.cors <- do.call(rbind,lapply(lgep.vs.ew.ridge.lasso.ok,function(x){
+  apply(x$lasso,2,function(z) cor(z,lgep.vs.ew.data$test.phenos$Volume))
+}))
+ok.cors <- do.call(rbind,lapply(lgep.vs.ew.ridge.lasso.ok,function(x){
+  apply(x$ok,2,function(z) cor(z,lgep.vs.ew.data$test.phenos$Volume))
+}))
+```
+
+* Gather the RMSE for each model/pval
+```{r rmse}
+lasso.rmse <- do.call(rbind,lapply(lgep.vs.ew.ridge.lasso.ok,function(x){
+  apply(x$lasso,2,function(z) RMSE(z,lgep.vs.ew.data$test.phenos$Volume))
+}))
+ridge.rmse <- do.call(rbind,lapply(lgep.vs.ew.ridge.lasso.ok,function(x){
+  apply(x$ridge,2,function(z) RMSE(z,lgep.vs.ew.data$test.phenos$Volume))
+}))
+ok.rmse <- do.call(rbind,lapply(lgep.vs.ew.ridge.lasso.ok,function(x){
+  apply(x$ok,2,function(z) RMSE(z,lgep.vs.ew.data$test.phenos$Volume))
+}))
+```
+
+
+## Plot correlation results
+
+* Pearson correlation of prediction vs. truth for each model/pval/data-type
+
+```{r plot.cor, echo=F}
+long.dat <- data.frame("model"=rep(c("ridge","lasso","ok"),each=24),"rmse"=c(ridge.rmse,lasso.rmse,ok.rmse), "cors"=c(ridge.cors,lasso.cors,ok.cors),"data.type"=rep(rep(c("txpts","snps","txpts.snps"),each=8),3),
+"pval"=as.factor(rep(rep(pvals,times=3),times=3)))
+p <- ggplot(long.dat,aes(x=pval,y=cors,group=model)) + geom_point(aes(color=model)) + theme_pubclean() + xlab("FDR p-val threshold") + ylab("Pearson Correlation")
+facet(p,facet.by = c("data.type"))
+```
+
+## Plot RMSE results
+
+* Root mean square error of prediction vs. truth for each model/pval/data-type
+
+```{r rmse.plot, echo=F}
+p <- ggplot(long.dat,aes(x=pval,y=rmse,group=model)) + geom_point(aes(color=model)) + theme_pubclean() + xlab("FDR p-val threshold") + ylab("RMSE")
+facet(p,facet.by = c("data.type"))
+```
+
+## Plot best result
+
+* Best result was seen from lasso: txpts + snps FDR 0.10 (low RMSE & high correlation)
+
+```{r final.plot, echo=F}
+pred.dat <- data.frame("prediction"=lgep.vs.ew.ridge.lasso.ok[[3]]$lasso$txpts.snps,"truth"=lgep.vs.ew.data$test.phenos$Volume)
+ggplot(pred.dat,aes(x=prediction,y=truth)) + geom_point() + theme_pubclean() + geom_smooth(method = "lm") + theme_pubclean() + stat_cor() + ylab("True BV") + xlab("Predicted BV")
+```
+

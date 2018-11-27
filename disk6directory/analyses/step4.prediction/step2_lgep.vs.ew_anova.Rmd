@@ -30,6 +30,7 @@ names(ordered.data)
 * Training set will be all LGEP families, including those from EW which overlapped
 
 ```{r anova}
+ordered.data$bio.counts <- scale(log2(ordered.data$bio.counts + 1),center=F)
 rm.ew.rows <- which(as.character(ordered.data$bio.phenos$fam_id) %in% ordered.data$ew.fams)
 train.bio.counts <- ordered.data$bio.counts[-rm.ew.rows,]
 train.bio.snps <- ordered.data$bio.snps[-rm.ew.rows,]
@@ -66,6 +67,7 @@ hist(fdr.snp.pvals,main = "FDR adjusted SNP p-vals LGEP")
 
 ```{r create.train}
 rm.ew.fams <- which(as.character(ordered.data$fam.phenos$fam_id) %in% ordered.data$ew.fams)
+ordered.data$fam.counts <- scale(log2(ordered.data$fam.counts + 1),center=F)
 train.lgep.counts <- ordered.data$fam.counts[-rm.ew.fams,]
 train.lgep.snps <- ordered.data$fam.snps[-rm.ew.fams,]
 train.lgep.phenos <- ordered.data$fam.phenos[-rm.ew.fams,]
