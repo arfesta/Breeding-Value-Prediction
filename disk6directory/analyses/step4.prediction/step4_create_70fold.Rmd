@@ -1,0 +1,99 @@
+---
+title: "step4_create.70-fold.Rmd"
+author: "Adam Festa"
+date: "11/27/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose
+
+The purpose of this script is to generate FDR adjusted p-values using the 70 training groups with SNPs & Transcripts
+
+## Load Data 
+
+* Load the starting dataset genereated in step 2 (ordering data)
+
+```{r load.dat}
+library(caret);library(parallel)
+load("~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/ordered.data.RData")
+names(ordered.data)
+```
+
+## Create train/test folds
+
+* Create the 70 train/test groups by first setting the seed and then using caret to create 10 replicates of 7-fold cross validation
+
+* Family names of the training and test groups are placed in amatrix
+
+```{r train.test}
+set.seed(24826)
+all.folds <- createMultiFolds(y=ordered.data$fam.phenos$Volume,times = 10,k = 7)
+# Each Rep corresponds to a single 7-fold CV (Rep 1: folds 1-7 rep1; Rep2: folds 1-7 rep2)
+
+train.index.matrix <- do.call(rbind,all.folds)
+test.index.matrix <- do.call(rbind,lapply(1:70,function(x) {
+  c(1:56)[-c(train.index.matrix[x,])]
+}))
+
+train.fam.matrix <- do.call(rbind,lapply(1:70,function(x) {
+  as.character(ordered.data$fam.phenos$fam_id)[c(train.index.matrix[x,])]
+}))
+test.fam.matrix <- do.call(rbind,lapply(1:70,function(x) {
+  as.character(ordered.data$fam.phenos$fam_id)[-c(train.index.matrix[x,])]
+}))
+```
+
+
+## Conduct anova
+
+* First conduct anova on transcripts for each of the 70 groups.  The biological replicate counts are first log2-transformed and scaled across all counts
+
+```{r anova.txpts}
+log.bio.counts <- scale(log2(ordered.data$bio.counts + 1),center = F)
+
+pt <- proc.time()
+txpt.anova.scores <- mclapply(1:70,function(each.group){
+  select <- which(as.character(ordered.data$bio.phenos$fam_id) %in% train.fam.matrix[each.group,])
+  train.dat <- log.bio.counts[select,]
+  train.p <- ordered.data$bio.phenos$Volume[select]
+  pval.trains <- apply(train.dat,2,function(z) anovaScores(x = z,y = train.p))
+  p.adjust(pval.trains,method = "fdr")
+},mc.cores = 8)
+proc.time() - pt
+```
+
+* Now conduct anova on SNPs for each of the 70 groups.
+
+```{r anova.snps}
+pt <- proc.time()
+snp.anova.scores <- mclapply(1:70,function(each.group){
+  select <- which(as.character(ordered.data$bio.phenos$fam_id) %in% train.fam.matrix[each.group,])
+  train.dat <- ordered.data$bio.snps[select,]
+  train.p <- ordered.data$bio.phenos$Volume[select]
+  pval.trains <- apply(train.dat,2,function(z) anovaScores(x = z,y = train.p))
+  p.adjust(pval.trains,method = "fdr")
+},mc.cores = 8)
+proc.time() - pt
+```
+
+
+## Save output
+
+* Create list of objects needed and save
+
+```{r save}
+
+fam.counts <- scale(log2(ordered.data$fam.counts + 1),center=F)
+
+cv.70.data <- list("snp.fdr.anova"=snp.anova.scores,"txpt.fdr.anova"=txpt.anova.scores,
+                   "train.index"=train.index.matrix,"test.index"=test.index.matrix,
+                   "train.fam.index"=train.fam.matrix,"test.fam.index"=test.fam.matrix,
+                   "fam.phenos"=ordered.data$fam.phenos,"all.counts"=fam.counts,
+                   "all.snps"=ordered.data$fam.snps)
+save(cv.70.data,file = "~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/cv.70.data.RData",compress=T)
+```
+
