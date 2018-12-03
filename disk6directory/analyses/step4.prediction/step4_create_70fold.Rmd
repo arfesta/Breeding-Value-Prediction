@@ -1,7 +1,7 @@
 ---
 title: "step4_create.70-fold.Rmd"
 author: "Adam Festa"
-date: "11/27/2018"
+date: "12/3/2018"
 output: html_document
 ---
 
@@ -18,7 +18,7 @@ The purpose of this script is to generate FDR adjusted p-values using the 70 tra
 * Load the starting dataset genereated in step 2 (ordering data)
 
 ```{r load.dat}
-library(caret);library(parallel)
+library(caret);library(parallel); library(Hmisc) # cut2
 load("~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/ordered.data.RData")
 names(ordered.data)
 ```
@@ -30,21 +30,27 @@ names(ordered.data)
 * Family names of the training and test groups are placed in amatrix
 
 ```{r train.test}
-set.seed(24826)
-all.folds <- createMultiFolds(y=ordered.data$fam.phenos$Volume,times = 10,k = 7)
-# Each Rep corresponds to a single 7-fold CV (Rep 1: folds 1-7 rep1; Rep2: folds 1-7 rep2)
+even.pheno.split <- split(ordered.data$fam.phenos$Volume, cut2(ordered.data$fam.phenos$Volume, g=8))
+even.pheno.split.index <- do.call(rbind,lapply(1:8,function(each.split){
+  which(ordered.data$fam.phenos$Volume %in% even.pheno.split[[each.split]])
+}))
 
-train.index.matrix <- do.call(rbind,all.folds)
-test.index.matrix <- do.call(rbind,lapply(1:70,function(x) {
-  c(1:56)[-c(train.index.matrix[x,])]
+
+set.seed(43523)
+test.index.matrix <- do.call(rbind,lapply(1:10,function(each.fold) {
+  apply(even.pheno.split.index,1,function(x){t(sample(x,replace = F))
+})}))
+train.index.matrix <- do.call(rbind,lapply(1:70,function(x){
+  c(1:56)[-test.index.matrix[x,]]
 }))
 
 train.fam.matrix <- do.call(rbind,lapply(1:70,function(x) {
   as.character(ordered.data$fam.phenos$fam_id)[c(train.index.matrix[x,])]
 }))
 test.fam.matrix <- do.call(rbind,lapply(1:70,function(x) {
-  as.character(ordered.data$fam.phenos$fam_id)[-c(train.index.matrix[x,])]
+  as.character(ordered.data$fam.phenos$fam_id)[c(test.index.matrix[x,])]
 }))
+
 ```
 
 
@@ -61,7 +67,6 @@ txpt.anova.scores <- mclapply(1:70,function(each.group){
   train.dat <- log.bio.counts[select,]
   train.p <- ordered.data$bio.phenos$Volume[select]
   pval.trains <- apply(train.dat,2,function(z) anovaScores(x = z,y = train.p))
-  p.adjust(pval.trains,method = "fdr")
 },mc.cores = 8)
 proc.time() - pt
 ```
@@ -73,9 +78,11 @@ pt <- proc.time()
 snp.anova.scores <- mclapply(1:70,function(each.group){
   select <- which(as.character(ordered.data$bio.phenos$fam_id) %in% train.fam.matrix[each.group,])
   train.dat <- ordered.data$bio.snps[select,]
+  tt <- apply(train.dat,2,function(x) length(unique(x)))
+  rm.these <-  which(tt == 1)
+  train.dat <- train.dat[,-rm.these]
   train.p <- ordered.data$bio.phenos$Volume[select]
   pval.trains <- apply(train.dat,2,function(z) anovaScores(x = z,y = train.p))
-  p.adjust(pval.trains,method = "fdr")
 },mc.cores = 8)
 proc.time() - pt
 ```
@@ -94,6 +101,6 @@ cv.70.data <- list("snp.fdr.anova"=snp.anova.scores,"txpt.fdr.anova"=txpt.anova.
                    "train.fam.index"=train.fam.matrix,"test.fam.index"=test.fam.matrix,
                    "fam.phenos"=ordered.data$fam.phenos,"all.counts"=fam.counts,
                    "all.snps"=ordered.data$fam.snps)
-save(cv.70.data,file = "~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/cv.70.data.RData",compress=T)
+save(cv.70.data,file = "~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/step4_create.70.RData",compress=T)
 ```
 

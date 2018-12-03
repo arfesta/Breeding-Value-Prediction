@@ -1,0 +1,137 @@
+---
+title: "step5_cv.70.predictions.Rmd"
+author: "Adam Festa"
+date: "12/3/2018"
+output: html_document
+---
+
+## Objective
+
+The purpose of this script is to donduct predictions on the p-value subsets using OmicKriging, Lasso, & Ridge.
+
+## Load libraries & Data
+
+* The cross-validation data was previously saved in the previous step.
+
+```
+library(glmnet); library(doParallel); library(ggplot2)
+library(ggpubr); library(OmicKriging); library(caret)
+load("~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/step4_create.70.RData")
+names(cv.70.data)
+```
+
+* Estabilsh the p-value subsets to test and register backend cores which will be used within loop for cv.glmnet
+
+```
+pvals <- c(.01,.05,.1,.15,.2,.25,.3,1)
+registerDoParallel(cores=30)
+```
+
+
+## Conduct Predictions
+
+* The below chunk of code goes through predictions for a single test group (1 out of the 70 test groups) at a time by doing the following:
+
+  * The train index object is used to subset the corresponding group from the complete snp and transcript matrix
+  
+  *  The anova scores estimated using the sepcficied training index are fdr-adjusted and subset from snp and transcript matrix to predict using lasso, ridge, or omickriging.
+  
+  * Prediction of lasso and ridge was done using cv.glmnet to estimate lambda with alpha set to 0 or 1
+  
+  * Prediction using OmicKriging was done by subsetting a single training set and conducting a LOO-cv to estimate the weight which minizimed the RMSE across all predictions for a given training set.
+
+```
+cv.group.predictions <- mclapply(1:70, function(this.group){
+training.set <- cv.70.data$train.index[this.group,]
+test.set <- cv.70.data$test.index[this.group,]
+txpt.pval.set <- cv.70.data$txpt.fdr.anova[[this.group]]
+txpt.pval.set <- p.adjust(txpt.pval.set,method = "fdr")
+snp.pval.set <- cv.70.data$snp.fdr.anova[[this.group]]
+snp.pval.set <- p.adjust(snp.pval.set,method = "fdr")
+group.results <- lapply(1:8,function(each){
+  # First transcripts ridge/lasso
+  pval.train <- cv.70.data$all.counts[training.set,which(txpt.pval.set <= pvals[each])]
+  pval.test <- cv.70.data$all.counts[test.set,which(txpt.pval.set <= pvals[each])]
+  lasso.cv <- cv.glmnet(x = pval.train,y = cv.70.data$fam.phenos$Volume[training.set],parallel = F,alpha=1,nfolds = length(training.set),grouped = F,standardize=F,type.measure="mae")
+  txpt.lasso.pred <- predict.cv.glmnet(object = lasso.cv,newx = pval.test,s = lasso.cv$lambda.min)
+  txpt.lasso.features <- colnames(pval.train)[which(coef.cv.glmnet(lasso.cv,s = lasso.cv$lambda.min) != 0)]
+  
+  ridge.cv <- cv.glmnet(x = pval.train,y = cv.70.data$fam.phenos$Volume[training.set],parallel = F,alpha=0,nfolds = length(training.set),grouped = F,standardize=F,type.measure="mae")
+  txpt.ridge.pred <- predict.cv.glmnet(object = ridge.cv,newx = pval.test,s = ridge.cv$lambda.min)
+  
+  # transcripts OK
+  x.train <- cor(t(pval.train))
+  y.train <- cv.70.data$fam.phenos[training.set,]
+  all.weights <- seq(.1,1,.1)
+  
+  train.rmse <- unlist(lapply(1:length(all.weights),function(each.weight){
+    this.w <- all.weights[each.weight]
+    ok.preds <- lapply(1:nrow(y.train),function(each.cv){
+      ok.pred <- okriging(idtest = as.character(y.train$fam_id)[each.cv],idtrain = as.character(y.train$fam_id)[-each.cv],corlist = list(x.train),H2vec = c(this.w),pheno = y.train,phenoname = "Volume")
+    })
+    ok.preds <-do.call(rbind,ok.preds)
+    RMSE(ok.preds[,2],ok.preds[,3])
+  }))
+  
+  final.weight <- all.weights[which.min(train.rmse)]
+  all.d <- rbind(pval.train,pval.test)
+  all.p <- rbind(y.train,cv.70.data$fam.phenos[test.set,])
+  x.cor <- cor(t(all.d))
+  y.train$fam_id <- as.character(y.train$fam_id)
+  ok.pred <- okriging(idtest = cv.70.data$test.fam.index[this.group,],idtrain = cv.70.data$train.fam.index[this.group,],corlist = list(x.cor),H2vec = c(final.weight),pheno = all.p ,phenoname = "Volume")
+  txpt.ok.pred <- ok.pred[,-c(1)]
+  
+  # Next snps ridge/lasso
+  pval.train <- as.matrix(cv.70.data$all.snps[training.set,names(snp.pval.set)[which(snp.pval.set <= pvals[each])]])
+  pval.test <- as.matrix(cv.70.data$all.snps[test.set,names(snp.pval.set)[which(snp.pval.set <= pvals[each])]])
+  lasso.cv <- cv.glmnet(x = pval.train,y = cv.70.data$fam.phenos$Volume[training.set],parallel = F,alpha=1,nfolds = length(training.set),grouped = F,standardize=F,type.measure="mae")
+  snp.lasso.pred <- predict.cv.glmnet(object = lasso.cv,newx = pval.test,s = lasso.cv$lambda.min)
+  snp.lasso.features <- colnames(pval.train)[which(coef.cv.glmnet(lasso.cv,s = lasso.cv$lambda.min) != 0)]
+  
+  ridge.cv <- cv.glmnet(x = pval.train,y = cv.70.data$fam.phenos$Volume[training.set],parallel = F,alpha=0,nfolds = length(training.set),grouped = F,standardize=F,type.measure="mae")
+  snp.ridge.pred <- predict.cv.glmnet(object = ridge.cv,newx = pval.test,s = ridge.cv$lambda.min)
+  
+  # snps OK
+  x.train <- cor(t(pval.train))
+  y.train <- cv.70.data$fam.phenos[training.set,]
+  all.weights <- seq(.1,1,.1)
+  
+  train.rmse <- unlist(lapply(1:length(all.weights),function(each.weight){
+    this.w <- all.weights[each.weight]
+    ok.preds <- lapply(1:nrow(y.train),function(each.cv){
+      ok.pred <- okriging(idtest = as.character(y.train$fam_id)[each.cv],idtrain = as.character(y.train$fam_id)[-each.cv],corlist = list(x.train),H2vec = c(this.w),pheno = y.train,phenoname = "Volume")
+    })
+    ok.preds <-do.call(rbind,ok.preds)
+    RMSE(ok.preds[,2],ok.preds[,3])
+  }))
+  
+  final.weight <- all.weights[which.min(train.rmse)]
+  all.d <- rbind(pval.train,pval.test)
+  all.p <- rbind(y.train,cv.70.data$fam.phenos[test.set,])
+  x.cor <- cor(t(all.d))
+  ok.pred <- okriging(idtest = cv.70.data$test.fam.index[this.group,],idtrain = cv.70.data$train.fam.index[this.group,],corlist = list(x.cor),H2vec = c(final.weight),pheno = all.p ,phenoname = "Volume")
+  snp.ok.pred <- ok.pred[,-1]
+  
+  both.ridge.pred <- (txpt.ridge.pred + snp.ridge.pred)/2
+  both.lasso.pred <- (txpt.lasso.pred + snp.lasso.pred)/2
+  both.ok.pred <- (txpt.ok.pred + snp.ok.pred)/2
+  
+  prediction.ridge <- data.frame("txpts"=txpt.ridge.pred,"snps"=snp.ridge.pred,"txpts.snps"=both.ridge.pred)
+  colnames(prediction.ridge) <- c("txpts","snps","txpts.snps")
+  prediction.lasso <- data.frame("txpts"=txpt.lasso.pred,"snps"=snp.lasso.pred,"txpts.snps"=both.lasso.pred)
+  colnames(prediction.lasso) <- c("txpts","snps","txpts.snps")
+  prediction.ok <- data.frame("txpts"=txpt.ok.pred[,-2],"snps"=snp.ok.pred[,-2],"txpts.snps"=both.ok.pred[,-2])
+  colnames(prediction.ok) <- c("txpts","snps","txpts.snps")
+  
+  lasso.features <- list("txpts"=txpt.lasso.features,"snps"=snp.lasso.features)
+  
+  results <- list("ridge"=prediction.ridge,"lasso"=prediction.lasso,"ok"=prediction.ok,"lasso.feats"=lasso.features)
+})
+},mc.cores=28,mc.allow.recursive = F)
+```
+
+* Save output
+
+```
+save(cv.group.predictions,file="~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/cv.group.predictions.RData")
+```

@@ -11,7 +11,6 @@
 
 <meta name="author" content="Adam Festa" />
 
-<meta name="date" content="2018-11-27" />
 
 <title>step4_create.70-fold.Rmd</title>
 
@@ -124,7 +123,7 @@ $(document).ready(function () {
 
 <h1 class="title toc-ignore">step4_create.70-fold.Rmd</h1>
 <h4 class="author"><em>Adam Festa</em></h4>
-<h4 class="date"><em>11/27/2018</em></h4>
+<h4 class="date"><em>12/3/2018</em></h4>
 
 </div>
 
@@ -138,9 +137,21 @@ $(document).ready(function () {
 <ul>
 <li>Load the starting dataset genereated in step 2 (ordering data)</li>
 </ul>
-<pre class="r"><code>library(caret);library(parallel)</code></pre>
+<pre class="r"><code>library(caret);library(parallel); library(Hmisc) # cut2</code></pre>
 <pre><code>## Loading required package: lattice</code></pre>
 <pre><code>## Loading required package: ggplot2</code></pre>
+<pre><code>## Loading required package: survival</code></pre>
+<pre><code>## 
+## Attaching package: 'survival'</code></pre>
+<pre><code>## The following object is masked from 'package:caret':
+## 
+##     cluster</code></pre>
+<pre><code>## Loading required package: Formula</code></pre>
+<pre><code>## 
+## Attaching package: 'Hmisc'</code></pre>
+<pre><code>## The following objects are masked from 'package:base':
+## 
+##     format.pval, units</code></pre>
 <pre class="r"><code>load(&quot;~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/ordered.data.RData&quot;)
 names(ordered.data)</code></pre>
 <pre><code>## [1] &quot;bio.counts&quot;     &quot;bio.snps&quot;       &quot;bio.phenos&quot;     &quot;fam.counts&quot;    
@@ -153,20 +164,25 @@ names(ordered.data)</code></pre>
 <li><p>Create the 70 train/test groups by first setting the seed and then using caret to create 10 replicates of 7-fold cross validation</p></li>
 <li><p>Family names of the training and test groups are placed in amatrix</p></li>
 </ul>
-<pre class="r"><code>set.seed(24826)
-all.folds &lt;- createMultiFolds(y=ordered.data$fam.phenos$Volume,times = 10,k = 7)
-# Each Rep corresponds to a single 7-fold CV (Rep 1: folds 1-7 rep1; Rep2: folds 1-7 rep2)
+<pre class="r"><code>even.pheno.split &lt;- split(ordered.data$fam.phenos$Volume, cut2(ordered.data$fam.phenos$Volume, g=8))
+even.pheno.split.index &lt;- do.call(rbind,lapply(1:8,function(each.split){
+  which(ordered.data$fam.phenos$Volume %in% even.pheno.split[[each.split]])
+}))
 
-train.index.matrix &lt;- do.call(rbind,all.folds)
-test.index.matrix &lt;- do.call(rbind,lapply(1:70,function(x) {
-  c(1:56)[-c(train.index.matrix[x,])]
+
+set.seed(43523)
+test.index.matrix &lt;- do.call(rbind,lapply(1:10,function(each.fold) {
+  apply(even.pheno.split.index,1,function(x){t(sample(x,replace = F))
+})}))
+train.index.matrix &lt;- do.call(rbind,lapply(1:70,function(x){
+  c(1:56)[-test.index.matrix[x,]]
 }))
 
 train.fam.matrix &lt;- do.call(rbind,lapply(1:70,function(x) {
   as.character(ordered.data$fam.phenos$fam_id)[c(train.index.matrix[x,])]
 }))
 test.fam.matrix &lt;- do.call(rbind,lapply(1:70,function(x) {
-  as.character(ordered.data$fam.phenos$fam_id)[-c(train.index.matrix[x,])]
+  as.character(ordered.data$fam.phenos$fam_id)[c(test.index.matrix[x,])]
 }))</code></pre>
 </div>
 <div id="conduct-anova" class="section level2">
@@ -182,11 +198,10 @@ txpt.anova.scores &lt;- mclapply(1:70,function(each.group){
   train.dat &lt;- log.bio.counts[select,]
   train.p &lt;- ordered.data$bio.phenos$Volume[select]
   pval.trains &lt;- apply(train.dat,2,function(z) anovaScores(x = z,y = train.p))
-  p.adjust(pval.trains,method = &quot;fdr&quot;)
 },mc.cores = 8)
 proc.time() - pt</code></pre>
 <pre><code>##      user    system   elapsed 
-## 11981.057    61.684  1945.141</code></pre>
+## 12642.988    81.178  2131.671</code></pre>
 <ul>
 <li>Now conduct anova on SNPs for each of the 70 groups.</li>
 </ul>
@@ -194,13 +209,15 @@ proc.time() - pt</code></pre>
 snp.anova.scores &lt;- mclapply(1:70,function(each.group){
   select &lt;- which(as.character(ordered.data$bio.phenos$fam_id) %in% train.fam.matrix[each.group,])
   train.dat &lt;- ordered.data$bio.snps[select,]
+  tt &lt;- apply(train.dat,2,function(x) length(unique(x)))
+  rm.these &lt;-  which(tt == 1)
+  train.dat &lt;- train.dat[,-rm.these]
   train.p &lt;- ordered.data$bio.phenos$Volume[select]
   pval.trains &lt;- apply(train.dat,2,function(z) anovaScores(x = z,y = train.p))
-  p.adjust(pval.trains,method = &quot;fdr&quot;)
 },mc.cores = 8)
 proc.time() - pt</code></pre>
-<pre><code>##     user   system  elapsed 
-## 9885.433   53.303 1349.162</code></pre>
+<pre><code>##      user    system   elapsed 
+## 10376.545    75.400  1417.121</code></pre>
 </div>
 <div id="save-output" class="section level2">
 <h2>Save output</h2>
@@ -214,7 +231,7 @@ cv.70.data &lt;- list(&quot;snp.fdr.anova&quot;=snp.anova.scores,&quot;txpt.fdr.
                    &quot;train.fam.index&quot;=train.fam.matrix,&quot;test.fam.index&quot;=test.fam.matrix,
                    &quot;fam.phenos&quot;=ordered.data$fam.phenos,&quot;all.counts&quot;=fam.counts,
                    &quot;all.snps&quot;=ordered.data$fam.snps)
-save(cv.70.data,file = &quot;~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/cv.70.data.RData&quot;,compress=T)</code></pre>
+save(cv.70.data,file = &quot;~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/step4_create.70.RData&quot;,compress=T)</code></pre>
 </div>
 
 
