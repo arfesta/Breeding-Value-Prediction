@@ -1,0 +1,154 @@
+---
+title: "step6_visualize_predictions.Rmd"
+author: "Adam Festa"
+date: "12/3/2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load data
+
+Load starting data and library packages
+
+```{r cars}
+library(caret,quietly = T); library(ggpubr,quietly = T)
+load("~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/step4_create.70.RData")
+load("~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/step5_cv.group.predictions.RData")
+```
+
+
+## Starting data
+
+* The object cv.70.data contains the train index, count/snp matrices, and phenotypes. The object cv.group.predictions is a list of predictions for each of the 70 unique test sets 
+
+* Within each of the 70 lists contain another set of 8 corresponding to fdr adjusted p-values: 0.01, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, & 1
+
+* For each adjusted p-value there are prediction results for snps, transcripts and snps + transcripts for ridge/lasso/omickriging
+
+
+```{r pressure, echo=FALSE}
+length(cv.group.predictions)
+length(cv.group.predictions[[1]])
+
+# Test group 1, subsetting at pvalue of 0.01
+names(cv.group.predictions[[1]][[1]])
+# Test group 1, subsetting at pvalue of 0.05
+names(cv.group.predictions[[1]][[2]])
+```
+
+
+## Group correlation
+
+* For a single p-value identify the correlation of predicted vs. true breeding values within each of the 70 test sets
+
+```{r }
+
+true.breeding.values <- lapply(1:70,function(each.test.group){
+  these.indvs <- cv.70.data$test.index[each.test.group,]
+  cv.70.data$fam.phenos$Volume[these.indvs]
+})
+
+pvals <- c(0.01,.05,.1,.15,.2,.25,.3,1)
+final.dat <- lapply(1:8,function(each.p){
+
+  lasso.predictions <- unlist(lapply(1:70,function(x) {
+    cor(cv.group.predictions[[x]][[each.p]]$lasso,true.breeding.values[[x]])}))
+  lasso.predictions <- data.frame("cors"=lasso.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="lasso","pval"=pvals[each.p],"group"=rep(c(1:70),each=3))
+  
+  ridge.predictions <- unlist(lapply(1:70,function(x){
+    cor(cv.group.predictions[[x]][[each.p]]$ridge,true.breeding.values[[x]])}))
+  ridge.predictions <- data.frame("cors"=ridge.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="ridge","pval"=pvals[each.p],"group"=rep(c(1:70),each=3))
+  
+  ok.predictions <- unlist(lapply(1:70,function(x){
+  cor(cv.group.predictions[[x]][[each.p]]$ok,true.breeding.values[[x]])}))
+  ok.predictions <- data.frame("cors"=ok.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="ok","pval"=pvals[each.p],"group"=rep(c(1:70),each=3))
+
+this.p <- rbind(lasso.predictions,ridge.predictions,ok.predictions)
+})
+
+
+p.cor.data <- do.call(rbind,final.dat)
+p.cor.data[which(is.na(p.cor.data$cors) == T),1]  <- 0
+p.cor.data$pval = as.factor(p.cor.data$pval)
+p.cor.data$data.type = as.factor(p.cor.data$data.type)
+p <- ggplot(data=p.cor.data,mapping = aes(x=pval,y=cors)) + geom_boxplot(aes(fill=model)) + theme_pubclean()
+p + facet_grid(~ data.type)
+```
+
+## Group RMSE
+
+* For a single p-value identify the correlation of predicted vs. true breeding values within each of the 70 test sets
+
+```{r }
+train.breeding.values <- lapply(1:70,function(each.test.group){
+  these.indvs <- cv.70.data$train.index[each.test.group,]
+  cv.70.data$fam.phenos$Volume[these.indvs]
+})
+
+true.breeding.values <- lapply(1:70,function(each.test.group){
+  these.indvs <- cv.70.data$test.index[each.test.group,]
+  cv.70.data$fam.phenos$Volume[these.indvs]
+})
+
+pvals <- c(0.01,.05,.1,.15,.2,.25,.3,1)
+final.dat <- lapply(1:8,function(each.p){
+
+  lasso.predictions <- unlist(lapply(1:70,function(x) {
+    apply(cv.group.predictions[[x]][[each.p]]$lasso,2,function(z) RMSE(z,true.breeding.values[[x]]))}))
+    
+  lasso.predictions <- data.frame("cors"=lasso.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="lasso","pval"=pvals[each.p],"group"=rep(c(1:70),each=3))
+  
+  ridge.predictions <-  unlist(lapply(1:70,function(x) {
+    apply(cv.group.predictions[[x]][[each.p]]$ridge,2,function(z) RMSE(z,true.breeding.values[[x]]))}))
+  
+  ridge.predictions <- data.frame("cors"=ridge.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="ridge","pval"=pvals[each.p],"group"=rep(c(1:70),each=3))
+  
+  ok.predictions <- unlist(lapply(1:70,function(x) {
+    apply(cv.group.predictions[[x]][[each.p]]$ok,2,function(z) RMSE(z,true.breeding.values[[x]]))}))
+  ok.predictions <- data.frame("cors"=ok.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="ok","pval"=pvals[each.p],"group"=rep(c(1:70),each=3))
+
+this.p <- rbind(lasso.predictions,ridge.predictions,ok.predictions)
+})
+
+
+p.cor.data <- do.call(rbind,final.dat)
+p.cor.data$pval = as.factor(p.cor.data$pval)
+p.cor.data$data.type = as.factor(p.cor.data$data.type)
+p <- ggplot(data=p.cor.data,mapping = aes(x=pval,y=cors)) + geom_boxplot(aes(fill=model)) + theme_pubclean()
+p + facet_grid(~ data.type)
+```
+
+
+```{r}
+all.means <- lapply(train.breeding.values, mean)
+all.preds <- unlist(lapply(1:70,function(x) cv.group.predictions[[x]][[8]]$lasso$txpts.snps - all.means[[x]]))
+all.trues <- unlist(lapply(1:70,function(x) true.breeding.values[[x]] - all.means[[x]]))
+#true breeding values contains all true
+plot(all.preds,all.trues)
+cor(all.preds,all.trues)
+```
+
+
+```{r}
+all.fams <- unlist(lapply(1:70,function(x) cv.70.data$test.fam.index[x,]))
+
+
+
+fam.preds <- unlist(lapply(1:56,function(x){
+  these.fams <- which(all.fams %in% as.character(cv.70.data$fam.phenos$fam_id)[x])
+  mean(all.preds[these.fams])
+}))
+fam.trues <- unlist(lapply(1:56,function(x){
+  these.fams <- which(all.fams %in% as.character(cv.70.data$fam.phenos$fam_id)[x])
+  mean(all.trues[these.fams])
+}))
+
+#true breeding values contains all true
+fam.plot <- data.frame("prediction"=fam.preds,"true.vals"=fam.trues)
+ggplot(fam.plot,aes(x=prediction,y=true.vals)) + geom_point() + geom_smooth(method="lm") + stat_cor() + theme_pubclean() + geom_vline(xintercept = 0) + geom_hline(yintercept = 0)
+```

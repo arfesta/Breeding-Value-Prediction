@@ -110,5 +110,8 @@ The counts were normarlized *multiple* ways, however only the #1 was used for pr
 
 Just as when predicting on the EW families, predictions were carried out for each of the 70 unique test groups: [predict 70-fold](https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step5_cv.70.predictions.Rmd)
   
+#### Visualize prediction of 70-fold
+
+[70-fold-cv markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step6_visualize_predictions.html)
  
  
