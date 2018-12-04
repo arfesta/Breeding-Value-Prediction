@@ -112,6 +112,6 @@ Just as when predicting on the EW families, predictions were carried out for eac
   
 #### Visualize prediction of 70-fold
 
-[70-fold-cv markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step6_visualize_predictions.html)
+[70-fold-cv markdown](https://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step6_visualize_predictions.html)
  
  
