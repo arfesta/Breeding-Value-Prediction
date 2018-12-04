@@ -10,8 +10,9 @@
     + [Step 1 - Data Prep](#step-1---data-prep)
     + [Step 2 - Load Count Data](#step-2---load-count-data)
     + [Step 3 - Transcript normalization and SNP filtering](#step-3---transcript-normalization-and-snp-filtering)
-    + [Step 4 - Prediction](#step-4---prediction)
-
+    + [Step 4 - Prediction of EW families with LGEP](#step-4---prediction-of-ew-families-with-lgep)
+    + [Step 5 - Prediction of 70-fold CV](#step-5---prediction-of-70-fold-cv)
+    
 ## Abstract
 
 * Phenotypic variation in forest trees may be partitioned into genomic and environmntal compenets which are consequently used to estimate the heritability of traits as the proportion of total phenotypic variation attributed to genetic variation.
@@ -82,21 +83,32 @@ The counts were normarlized *multiple* ways, however only the #1 was used for pr
   
   3. SNP's were filtered multiple ways: [markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step3.normalization/snp_filtering.html)
   
-
-### Step 4 - Prediction
-
-#### LGEP vs. EW
-
-  * LGEP vs. EW prediction Transcripts:
+  4. The final data sets used for prediction were restructured to be in identical order: [markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step1_data_restructure.html)
   
-   Counts returned post-normalization were then used for prediction with OmicKriging and glmnet: [count predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/LGEP_vs_EW/txpts/LGEP_EW_pred.html)
-   
-  * LGEP vs. EW prediction SNPS:
-  
-  The 012 SNP matrix post filtering was used for prediction with OmicKriging and glment: [snp predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/LGEP_vs_EW/snps/LGEP_EW_pred.snps.html)
 
-  Additionally, the caret package was used to test 12 different models with a LOOCV training on the LGEP: [caret SNP predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/LGEP_vs_EW/snps/LGEP_EW_pred.caret.snpsV2.html)
-  
-#### All Families: LOOCV
+### Step 4 - Prediction of EW families with LGEP
 
-  * Predicting all 56 families with txpts: [LOO txpt predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/LOO/txpts/LOO_data_txpt_pred.html)
+ Estimate anova scores for features using LGEP and then conduct prediction on EW
+
+#### Generate anova scores using LGEP as training
+
+  Utilizing the biological replicate data sets, ANOVA scores were estimated for each feature (snp/transcript): [LGEP_ANOVA](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step2_lgep.vs.ew_anova.html)
+  
+#### Conduct prediction on EW
+
+   Family mean estimates of counts and snps were used for prediction with OmicKriging and glmnet (lasso/ridge): [EW predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step3_lgep.vs.ew_pred.html)
+  
+### Step 5 - Prediction of 70-fold CV
+
+ First construct the 70 test groups, estimate ANOVA scores, and then conduct predictions
+
+#### Construct 70 test groups
+
+ Instead of predicting across batch, here we split the complete data set into a 7-fold CV (repeated 10 times).  The cv groups were split so that each test fold had individuals which were spread across the phenotypic range: [create 70 fold](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step4_create_70fold.html)
+ 
+#### Conduct prediction on each of the test folds
+
+Just as when predicting on the EW families, predictions were carried out for each of the 70 unique test groups: [predict 70-fold](https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step5_cv.70.predictions.Rmd)
+  
+ 
+ 
