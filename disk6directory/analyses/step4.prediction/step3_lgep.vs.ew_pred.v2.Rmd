@@ -1,0 +1,180 @@
+---
+title: "LGEP vs. EW Prediction"
+author: "Adam Festa"
+date: "12/10/2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+  
+  ## Purpose
+  
+  The purpose of this script is to conduct predictions with ridge, lasso, and OmicKriging on the EW families using the LGEP families
+ 
+## Load starting data
+ 
+* Load the LGEP vs EW data & R packages
+ 
+```{r load.data}
+library(glmnet); library(doParallel); library(ggplot2)
+library(ggpubr); library(OmicKriging); library(caret)
+load("./lgep.vs.ew.data.RData")
+names(lgep.vs.ew.data)
+```
+ 
+* Specify fdr p-values to test and register cores
+ 
+```{r pvals}
+registerDoParallel(cores=30)
+```
+ 
+## Ridge/Lasso/OK
+ 
+* For each p-value subset, we run cv.glmnet to determine lambda for lasso and ridge, then predict on EW families using the minimum lambda value.
+ 
+* Resulting output is predictions at each p-value using txpts, snps, or txpts + snps with ridge/lasso.  Additionally, features which were used in lasso model are stored in list output
+ 
+```{r ridge.lasso}
+ 
+  # First transcripts ridge/lasso
+  pval.train <- lgep.vs.ew.data$train.counts
+  pval.test <- lgep.vs.ew.data$test.counts
+  
+  gl.mod <- glmnet(x = pval.train,y =lgep.vs.ew.data$train.phenos$Volume,alpha = 1,standardize = F)
+  gl.mod1 <- as.matrix(coef(gl.mod))
+  gl.mod1 <- apply(gl.mod1,1,function(x) length(unique(x)))[-1]
+  these <-  which(gl.mod1 > 1)
+  lasso.cv <- cv.glmnet(x = pval.train[,these],y = lgep.vs.ew.data$train.phenos$Volume,parallel = T,alpha=1,nfolds = 45,grouped = F,standardize=F,type.measure = "mae")
+  
+  txpt.lasso.pred <- predict.cv.glmnet(object = lasso.cv,newx = pval.test[,these],s = lasso.cv$lambda.min)
+  txpt.lasso.features <- colnames(pval.train)[which(coef.cv.glmnet(lasso.cv,s = lasso.cv$lambda.min) != 0)]
+  
+  ridge.cv <- cv.glmnet(x = pval.train,y = lgep.vs.ew.data$train.phenos$Volume,parallel = T,alpha=0,nfolds = 45,grouped = F,standardize=F,type.measure = "mae")
+  txpt.ridge.pred <- predict.cv.glmnet(object = ridge.cv,newx = pval.test,s = ridge.cv$lambda.min)
+  
+  # transcripts OK
+  x.train <- cor(t(pval.train))
+  y.train <- lgep.vs.ew.data$train.phenos
+  all.weights <- seq(.1,1,.1)
+  
+  train.rmse <- unlist(lapply(1:length(all.weights),function(each.weight){
+    this.w <- all.weights[each.weight]
+    ok.preds <- lapply(1:nrow(y.train),function(each.cv){
+      ok.pred <- okriging(idtest = y.train$fam_id[each.cv],idtrain = y.train$fam_id[-each.cv],corlist = list(x.train),H2vec = c(this.w),pheno = y.train,phenoname = "Volume")
+    })
+    ok.preds <-do.call(rbind,ok.preds)
+    RMSE(ok.preds[,2],ok.preds[,3])
+  }))
+  
+  final.weight <- all.weights[which.min(train.rmse)]
+  all.d <- rbind(pval.train,pval.test)
+  all.p <- rbind(y.train,lgep.vs.ew.data$test.phenos)
+  x.cor <- cor(t(all.d))
+  ok.pred <- okriging(idtest = lgep.vs.ew.data$test.phenos$fam_id,idtrain = lgep.vs.ew.data$train.phenos$fam_id,corlist = list(x.cor),H2vec = c(final.weight),pheno = all.p ,phenoname = "Volume")
+  txpt.ok.pred <- ok.pred[,-c(1)]
+  
+  # Next snps ridge/lasso
+  pval.train <- as.matrix(lgep.vs.ew.data$train.snps)
+  pval.test <- as.matrix(lgep.vs.ew.data$test.snps)
+  
+  gl.mod <- glmnet(x = pval.train,y =lgep.vs.ew.data$train.phenos$Volume,alpha = 1,standardize = F)
+  gl.mod1 <- as.matrix(coef.glmnet(gl.mod))
+  gl.mod1 <- apply(gl.mod1,1,function(x) length(unique(x)))[-1]
+  these <-  which(gl.mod1 > 1)
+  lasso.cv <- cv.glmnet(x = pval.train[,names(these)],y = lgep.vs.ew.data$train.phenos$Volume,parallel = T,alpha=1,nfolds = 45,grouped = F,standardize=F,type.measure = "mae")
+  
+  snp.lasso.pred <- predict.cv.glmnet(object = lasso.cv,newx = pval.test[,names(these)],s = lasso.cv$lambda.min)
+  snp.lasso.features <- colnames(pval.train[,names(these)])[which(coef.cv.glmnet(lasso.cv,s = lasso.cv$lambda.min)[-1] != 0)]
+ 
+  ridge.cv <- cv.glmnet(x = pval.train,y = lgep.vs.ew.data$train.phenos$Volume,parallel = T,alpha=0,nfolds = 45,grouped = F,standardize=F,type.measure = "mae")
+  snp.ridge.pred <- predict.cv.glmnet(object = ridge.cv,newx = pval.test,s = ridge.cv$lambda.min)
+  
+  # snps OK
+  x.train <- cor(t(pval.train))
+  y.train <- lgep.vs.ew.data$train.phenos
+  all.weights <- seq(.1,1,.1)
+  
+  train.rmse <- unlist(lapply(1:length(all.weights),function(each.weight){
+    this.w <- all.weights[each.weight]
+    ok.preds <- lapply(1:nrow(y.train),function(each.cv){
+      ok.pred <- okriging(idtest = y.train$fam_id[each.cv],idtrain = y.train$fam_id[-each.cv],corlist = list(x.train),H2vec = c(this.w),pheno = y.train,phenoname = "Volume")
+    })
+    ok.preds <-do.call(rbind,ok.preds)
+    RMSE(ok.preds[,2],ok.preds[,3])
+  }))
+  
+  final.weight <- all.weights[which.min(train.rmse)]
+  all.d <- rbind(pval.train,pval.test)
+  all.p <- rbind(y.train,lgep.vs.ew.data$test.phenos)
+  x.cor <- cor(t(all.d))
+  ok.pred <- okriging(idtest = lgep.vs.ew.data$test.phenos$fam_id,idtrain = lgep.vs.ew.data$train.phenos$fam_id,corlist = list(x.cor),H2vec = c(final.weight),pheno = all.p ,phenoname = "Volume")
+  snp.ok.pred <- ok.pred[,-1]
+  
+  both.ridge.pred <- (txpt.ridge.pred + snp.ridge.pred)/2
+  both.lasso.pred <- (txpt.lasso.pred + snp.lasso.pred)/2
+  both.ok.pred <- (txpt.ok.pred + snp.ok.pred)/2
+  
+  prediction.ridge <- data.frame("txpts"=txpt.ridge.pred,"snps"=snp.ridge.pred,"txpts.snps"=both.ridge.pred)
+  colnames(prediction.ridge) <- c("txpts","snps","txpts.snps")
+  prediction.lasso <- data.frame("txpts"=txpt.lasso.pred,"snps"=snp.lasso.pred,"txpts.snps"=both.lasso.pred)
+  colnames(prediction.lasso) <- c("txpts","snps","txpts.snps")
+  prediction.ok <- data.frame("txpts"=txpt.ok.pred[,-2],"snps"=snp.ok.pred[,-2],"txpts.snps"=both.ok.pred[,-2])
+  colnames(prediction.ok) <- c("txpts","snps","txpts.snps")
+  
+  lasso.features <- list("txpts"=txpt.lasso.features,"snps"=snp.lasso.features)
+  
+  results <- list("ridge"=prediction.ridge,"lasso"=prediction.lasso,"ok"=prediction.ok,"lasso.feats"=lasso.features)
+ 
+```
+ 
+* Save output
+ 
+```{r save}
+save.image(file = "./lgep.vs.ew.ridge.lasso.ok.V2.RData",compress=T)
+```
+ 
+ 
+## Gather results
+ 
+* Gather the correlation for each model/pval
+ 
+```{r cor}
+ridge.cors <- apply(results$ridge,2,function(z) cor(z,lgep.vs.ew.data$test.phenos$Volume,method="spearman"))
+lasso.cors <- apply(results$lasso,2,function(z) cor(z,lgep.vs.ew.data$test.phenos$Volume,method="spearman"))
+ok.cors <- apply(results$ok,2,function(z) cor(z,lgep.vs.ew.data$test.phenos$Volume,method="spearman"))
+```
+ 
+* Gather the RMSE for each model/pval
+```{r rmse}
+ridge.rmse <- apply(results$ridge,2,function(z) RMSE(z,lgep.vs.ew.data$test.phenos$Volume))
+lasso.rmse <- apply(results$lasso,2,function(z) RMSE(z,lgep.vs.ew.data$test.phenos$Volume))
+ok.rmse <- apply(results$ok,2,function(z) RMSE(z,lgep.vs.ew.data$test.phenos$Volume))
+```
+ 
+ 
+## Plot correlation results
+ 
+* Pearson correlation of prediction vs. truth for each model/pval/data-type
+ 
+```{r plot.cor, echo=F}
+long.dat <- data.frame("model"=rep(c("ridge","lasso","ok"),each=3),"rmse"=c(ridge.rmse,lasso.rmse,ok.rmse), "cors"=c(ridge.cors,lasso.cors,ok.cors),"data.type"=rep(c("txpts","snps","txpts.snps"),times=3))
+ggplot(long.dat,aes(x=data.type,y=cors,group=model)) + geom_point(aes(color=model)) + theme_pubclean() + xlab("Data Type") + ylab("Spearman Correlation")
+ 
+```
+ 
+## Plot RMSE results
+ 
+* Root mean square error of prediction vs. truth for each model/pval/data-type
+ 
+```{r rmse.plot, echo=F}
+ggplot(long.dat,aes(x=data.type,y=rmse,group=model)) + geom_point(aes(color=model)) + theme_pubclean() + xlab("Data Type") + ylab("RMSE")
+```
+ 
+## Plot best result
+ 
+* Best result was seen from lasso: txpts + snps (low RMSE & high correlation)
+ 
+```{r final.plot, echo=F}
+pred.dat <- data.frame("prediction"=results$lasso$txpts.snps - mean(lgep.vs.ew.data$train.phenos$Volume),"truth"=lgep.vs.ew.data$test.phenos$Volume - mean(lgep.vs.ew.data$train.phenos$Volume))
+ggplot(pred.dat,aes(x=prediction,y=truth)) + geom_point() + theme_pubclean() + geom_smooth(method = "lm") + theme_pubclean() + stat_cor() + ylab("True BV") + xlab("Predicted BV")
+```

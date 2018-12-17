@@ -88,6 +88,13 @@ The counts were normarlized *multiple* ways, however only the #1 was used for pr
 
 ### Step 4 - Prediction of EW families with LGEP
 
+#### Conduct prediction on EW
+
+   Family mean estimates of counts and snps were used for prediction with OmicKriging and glmnet (lasso/ridge): [EW predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step3_lgep.vs.ew_pred.v2.html)
+
+
+#### **The below part is defunct, the scripts are still there but are not used. 
+
  Estimate anova scores for features using LGEP and then conduct prediction on EW
 
 #### Generate anova scores using LGEP as training
@@ -97,6 +104,7 @@ The counts were normarlized *multiple* ways, however only the #1 was used for pr
 #### Conduct prediction on EW
 
    Family mean estimates of counts and snps were used for prediction with OmicKriging and glmnet (lasso/ridge): [EW predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step3_lgep.vs.ew_pred.html)
+   
   
 ### Step 5 - Prediction of 70-fold CV
 
