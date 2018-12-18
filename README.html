@@ -313,14 +313,10 @@ abundance with Salmon. Additionally, this step includes identification of the in
 <div id="the-below-part-is-defunct-the-scripts-are-still-there-but-are-not-used." class="section level4">
 <h4>**The below part is defunct, the scripts are still there but are not used.</h4>
 <p>Estimate anova scores for features using LGEP and then conduct prediction on EW</p>
-</div>
-<div id="generate-anova-scores-using-lgep-as-training" class="section level4">
-<h4>Generate anova scores using LGEP as training</h4>
+<p>#### Generate anova scores using LGEP as training</p>
 <p>Utilizing the biological replicate data sets, ANOVA scores were estimated for each feature (snp/transcript):</p>
 <p><a href="http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step2_lgep.vs.ew_anova.html">LGEP_ANOVA</a></p>
-</div>
-<div id="conduct-prediction-on-ew-1" class="section level4">
-<h4>Conduct prediction on EW</h4>
+<p>#### Conduct prediction on EW</p>
 <p>Family mean estimates of counts and snps were used for prediction with OmicKriging and glmnet (lasso/ridge):</p>
 <p><a href="http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step3_lgep.vs.ew_pred.html">EW predictions</a></p>
 </div>
@@ -333,13 +329,20 @@ abundance with Salmon. Additionally, this step includes identification of the in
 <p>Instead of predicting across batch, here we split the complete data set into a 7-fold CV (repeated 10 times). The cv groups were split so that each test fold had individuals which were spread across the phenotypic range:</p>
 <p><a href="http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step4_create_70fold.html">create 70 fold</a></p>
 </div>
-<div id="conduct-prediction-on-each-of-the-test-folds" class="section level4">
-<h4>Conduct prediction on each of the test folds</h4>
+<div id="conduct-prediction-on-each-of-the-test-folds-using-all-data" class="section level4">
+<h4>Conduct prediction on each of the test folds using all data</h4>
+<p><a href="https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step5_cv.70.predictions.V2.R">prediction_script</a></p>
+</div>
+<div id="visualize-predictions" class="section level4">
+<h4>Visualize predictions</h4>
+<p><a href="https://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step6_visualize_predictions.v2.html">70 Fold CV visualization</a></p>
+</div>
+<div id="the-below-part-is-defunct-the-scripts-are-still-there-but-are-not-used.-1" class="section level4">
+<h4>**The below part is defunct, the scripts are still there but are not used.</h4>
+<p>#### Conduct prediction on each of the test folds across pvals</p>
 <p>Just as when predicting on the EW families, predictions were carried out for each of the 70 unique test groups:</p>
 <p><a href="https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step5_cv.70.predictions.Rmd">predict 70-fold</a></p>
-</div>
-<div id="visualize-prediction-of-70-fold" class="section level4">
-<h4>Visualize prediction of 70-fold</h4>
+<p>#### Visualize prediction of 70-fold</p>
 <p><a href="https://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step6_visualize_predictions.html">70-fold-cv markdown</a></p>
 </div>
 </div>

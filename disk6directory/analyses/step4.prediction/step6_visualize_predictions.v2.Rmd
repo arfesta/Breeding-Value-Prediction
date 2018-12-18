@@ -1,0 +1,208 @@
+---
+title: "Visualize 70 fold predictions"
+author: "Adam Festa"
+date: "12/18/2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load data
+
+Load starting data and library packages
+
+```{r cars}
+library(caret,quietly = T); library(ggpubr,quietly = T)
+
+summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
+                      conf.interval=.95, .drop=TRUE) {
+  library(plyr)
+  
+  # New version of length which can handle NA's: if na.rm==T, don't count them
+  length2 <- function (x, na.rm=FALSE) {
+    if (na.rm) sum(!is.na(x))
+    else       length(x)
+  }
+  
+  # This does the summary. For each group's data frame, return a vector with
+  # N, mean, and sd
+  datac <- ddply(data, groupvars, .drop=.drop,
+                 .fun = function(xx, col) {
+                   c(N    = length2(xx[[col]], na.rm=na.rm),
+                     mean = mean   (xx[[col]], na.rm=na.rm),
+                     sd   = sd     (xx[[col]], na.rm=na.rm)
+                   )
+                 },
+                 measurevar
+  )
+  
+  # Rename the "mean" column    
+  datac <- rename(datac, c("mean" = measurevar))
+  
+  datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
+  
+  # Confidence interval multiplier for standard error
+  # Calculate t-statistic for confidence interval: 
+  # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+  ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+  datac$ci <- datac$se * ciMult
+  
+  return(datac)
+}
+load("~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/step4_create.70.RData")
+load("~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/step5_cv.70.group.preds.v2.RData")
+```
+
+
+## Starting data
+
+* The object cv.70.data contains the train index, count/snp matrices, and phenotypes. The object cv.group.predictions is a list of predictions for each of the 70 unique test sets 
+
+* Within each of the 70 lists contain prediction results for snps, transcripts and snps + transcripts for ridge/lasso/omickriging
+
+
+```{r pressure, echo=FALSE}
+length(cv.70.group.preds)
+length(cv.70.group.preds[[1]])
+```
+
+
+## Group correlation
+
+* For a single p-value identify the correlation of predicted vs. true breeding values within each of the 70 test sets
+
+```{r }
+
+true.breeding.values <- lapply(1:70,function(each.test.group){
+  these.indvs <- cv.70.data$train.index[each.test.group,]
+  cv.70.data$fam.phenos$Volume[-these.indvs]
+})
+
+
+  lasso.predictions <- unlist(lapply(1:70,function(x) {
+    cor(cv.70.group.preds[[x]]$lasso,true.breeding.values[[x]])}))
+  lasso.predictions <- data.frame("cors"=lasso.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="lasso","group"=rep(c(1:70),each=3))
+  
+  ridge.predictions <- unlist(lapply(1:70,function(x){
+    cor(cv.70.group.preds[[x]]$ridge,true.breeding.values[[x]])}))
+  ridge.predictions <- data.frame("cors"=ridge.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="ridge","group"=rep(c(1:70),each=3))
+  
+  ok.predictions <- unlist(lapply(1:70,function(x){
+  cor(cv.70.group.preds[[x]]$ok,true.breeding.values[[x]])}))
+  ok.predictions <- data.frame("cors"=ok.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="ok","group"=rep(c(1:70),each=3))
+
+p.cor.data <- rbind(lasso.predictions,ridge.predictions,ok.predictions)
+
+p.cor.data$data.type = as.factor(p.cor.data$data.type)
+ggplot(data=p.cor.data,mapping = aes(x=data.type,y=cors)) + geom_boxplot(aes(fill=model)) + theme_pubclean()
+```
+
+
+## Group spearman correlation
+
+```{r }
+
+true.breeding.values <- lapply(1:70,function(each.test.group){
+  these.indvs <- cv.70.data$train.index[each.test.group,]
+  cv.70.data$fam.phenos$Volume[-these.indvs]
+})
+
+
+  lasso.predictions <- unlist(lapply(1:70,function(x) {
+    cor(cv.70.group.preds[[x]]$lasso,true.breeding.values[[x]],method="spearman")}))
+  lasso.predictions <- data.frame("cors"=lasso.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="lasso","group"=rep(c(1:70),each=3))
+  
+  ridge.predictions <- unlist(lapply(1:70,function(x){
+    cor(cv.70.group.preds[[x]]$ridge,true.breeding.values[[x]],method="spearman")}))
+  ridge.predictions <- data.frame("cors"=ridge.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="ridge","group"=rep(c(1:70),each=3))
+  
+  ok.predictions <- unlist(lapply(1:70,function(x){
+  cor(cv.70.group.preds[[x]]$ok,true.breeding.values[[x]],method="spearman")}))
+  ok.predictions <- data.frame("cors"=ok.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="ok","group"=rep(c(1:70),each=3))
+
+p.cor.data <- rbind(lasso.predictions,ridge.predictions,ok.predictions)
+
+p.cor.data$data.type = as.factor(p.cor.data$data.type)
+ggplot(data=p.cor.data,mapping = aes(x=data.type,y=cors)) + geom_boxplot(aes(fill=model)) + theme_pubclean()
+```
+
+## Group RMSE
+
+* For a single p-value identify the correlation of predicted vs. true breeding values within each of the 70 test sets
+
+```{r }
+
+true.breeding.values <- lapply(1:70,function(each.test.group){
+  these.indvs <- cv.70.data$train.index[each.test.group,]
+  cv.70.data$fam.phenos$Volume[-these.indvs]
+})
+
+
+  lasso.predictions <- unlist(lapply(1:70,function(x){
+    checkit <- cv.70.group.preds[[x]]$lasso
+    unlist(apply(checkit,2,function(z) RMSE(z,true.breeding.values[[x]])))
+                 }))
+  lasso.predictions <- data.frame("RMSE"=lasso.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="lasso","group"=rep(c(1:70),each=3))
+  
+  ridge.predictions <- unlist(lapply(1:70,function(x){
+    checkit <- cv.70.group.preds[[x]]$ridge
+    unlist(apply(checkit,2,function(z) RMSE(z,true.breeding.values[[x]])))
+                 }))
+  ridge.predictions <- data.frame("RMSE"=ridge.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="ridge","group"=rep(c(1:70),each=3))
+  
+  ok.predictions <- unlist(lapply(1:70,function(x){
+    checkit <- cv.70.group.preds[[x]]$ok
+    unlist(apply(checkit,2,function(z) RMSE(z,true.breeding.values[[x]])))
+                 }))
+  ok.predictions <- data.frame("RMSE"=ok.predictions,"data.type"=rep(c("txpts","snps","txpts.snps"),times=70),"model"="ok","group"=rep(c(1:70),each=3))
+
+p.cor.data <- rbind(lasso.predictions,ridge.predictions,ok.predictions)
+
+p.cor.data$data.type = as.factor(p.cor.data$data.type)
+ggplot(data=p.cor.data,mapping = aes(x=data.type,y=RMSE)) + geom_boxplot(aes(fill=model)) + theme_pubclean()
+```
+
+## Group prediction plot
+```{r}
+this.start <- seq(1,64,7)
+this.num <- seq(7,70,7)
+for(each in 1:length(this.start)){
+all.preds <- unlist(lapply(this.start[each]:this.num[each],function(x) cv.70.group.preds[[x]]$lasso$txpts.snps))
+all.trues <- unlist(lapply(this.start[each]:this.num[each],function(x) true.breeding.values[[x]] ))
+#all.trues <- unlist(lapply(1:70,function(x) true.breeding.values[[x]] - all.means[[x]]))
+#true breeding values contains all true
+plot(all.preds,all.trues)}
+```
+
+
+## Family mean prediction plot
+
+```{r}
+all.preds <- unlist(lapply(1:70,function(x) cv.70.group.preds[[x]]$lasso$txpts.snps))
+all.trues <- unlist(lapply(1:70,function(x) true.breeding.values[[x]]))
+#all.trues <- unlist(lapply(1:70,function(x) true.breeding.values[[x]] - all.means[[x]]))
+#true breeding values contains all true
+plot(all.preds,all.trues)
+```
+
+
+```{r}
+all.fams <- unlist(lapply(1:70,function(x) {
+  rm.these <- cv.70.data$train.index[x,]
+   cv.70.data$fam.phenos$fam_id[-rm.these]
+}))
+
+all.dat <- data.frame("fam"=all.fams,"prediction"=all.preds,"true.values"=all.trues)
+tgc2 <- summarySE(all.dat, measurevar="prediction", groupvars=c("fam"))
+tgc3 <- summarySE(all.dat, measurevar="true.values", groupvars=c("fam"))
+f.dat <- cbind(tgc2,"true.values"=tgc3$true.values)
+
+ggplot(f.dat,aes(x=prediction,y=true.values)) + geom_point() + geom_smooth(method="lm") +
+    stat_cor() + theme_pubclean() + geom_vline(xintercept = 117.8573) + geom_hline(yintercept = 117.8573) +  geom_errorbarh(aes(xmin=prediction-se, xmax=prediction+se)) 
+```
+
+

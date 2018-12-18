@@ -110,13 +110,13 @@ The counts were normarlized *multiple* ways, however only the #1 was used for pr
 
  Estimate anova scores for features using LGEP and then conduct prediction on EW
 
-#### Generate anova scores using LGEP as training
+ #### Generate anova scores using LGEP as training
 
   Utilizing the biological replicate data sets, ANOVA scores were estimated for each feature (snp/transcript): 
   
   [LGEP_ANOVA](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step2_lgep.vs.ew_anova.html)
   
-#### Conduct prediction on EW
+ #### Conduct prediction on EW
 
    Family mean estimates of counts and snps were used for prediction with OmicKriging and glmnet (lasso/ridge): 
    
@@ -132,14 +132,24 @@ The counts were normarlized *multiple* ways, however only the #1 was used for pr
  Instead of predicting across batch, here we split the complete data set into a 7-fold CV (repeated 10 times).  The cv groups were split so that each test fold had individuals which were spread across the phenotypic range: 
  
  [create 70 fold](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step4_create_70fold.html)
+
+#### Conduct prediction on each of the test folds using all data
+
+[prediction_script](https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step5_cv.70.predictions.V2.R)
+
+#### Visualize predictions
+
+[70 Fold CV visualization](https://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step6_visualize_predictions.v2.html)
+
+#### **The below part is defunct, the scripts are still there but are not used. 
  
-#### Conduct prediction on each of the test folds
+ #### Conduct prediction on each of the test folds across pvals
 
 Just as when predicting on the EW families, predictions were carried out for each of the 70 unique test groups: 
 
 [predict 70-fold](https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step5_cv.70.predictions.Rmd)
   
-#### Visualize prediction of 70-fold
+ #### Visualize prediction of 70-fold
 
 [70-fold-cv markdown](https://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step6_visualize_predictions.html)
  
