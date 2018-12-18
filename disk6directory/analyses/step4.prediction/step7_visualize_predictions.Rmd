@@ -1,0 +1,109 @@
+---
+title: "Visualize LOO predictions"
+author: "Adam Festa"
+date: "12/18/2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load data
+
+Load starting data and library packages
+
+```{r cars}
+library(caret,quietly = T); library(ggpubr,quietly = T)
+
+load("~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/step4_create.70.RData")
+load("~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/step7_loo.predictions.RData")
+```
+
+
+## Starting data
+
+* The object cv.70.data contains the train index, count/snp matrices, and phenotypes. The object cv.loo.predictions is a list of predictions for each of the 56 families
+
+* Within each of the 56 lists are predictions for that family using txpts, snps, or txpts + snps for each of the 3 models
+
+
+```{r pressure, echo=FALSE}
+length(cv.loo.predictions)
+length(cv.loo.predictions[[1]])
+```
+
+
+## Pearson correlation across all 56 families by Data Type & Model
+
+```{r }
+
+true.breeding.values <- cv.70.data$fam.phenos$Volume
+lasso.predictions <- do.call(rbind,lapply(cv.loo.predictions,function(x) x$lasso))
+apply(lasso.predictions,2,function(x) cor(x,true.breeding.values))
+
+ridge.predictions <- do.call(rbind,lapply(cv.loo.predictions,function(x) x$ridge))
+apply(ridge.predictions,2,function(x) cor(x,true.breeding.values))
+
+ok.predictions <- do.call(rbind,lapply(cv.loo.predictions,function(x) x$ok))
+apply(ok.predictions,2,function(x) cor(x,true.breeding.values))
+
+```
+
+## RMSE across all 56 families by Data Type & Model
+
+```{r }
+lasso.predictions <- do.call(rbind,lapply(cv.loo.predictions,function(x) x$lasso))
+apply(lasso.predictions,2,function(x) RMSE(x,true.breeding.values))
+
+ridge.predictions <- do.call(rbind,lapply(cv.loo.predictions,function(x) x$ridge))
+apply(ridge.predictions,2,function(x) RMSE(x,true.breeding.values))
+
+ok.predictions <- do.call(rbind,lapply(cv.loo.predictions,function(x) x$ok))
+apply(ok.predictions,2,function(x) RMSE(x,true.breeding.values))
+```
+
+## LOO prediction plot
+
+* The best accuracy came from txpts+snps using lasso. Let's plot the results:
+
+```{r}
+lasso.predictions <- do.call(rbind,lapply(cv.loo.predictions,function(x) x$lasso))
+plot(lasso.predictions$txpts.snps,true.breeding.values)
+```
+
+* Fitting LOESS
+
+```{r}
+f.dat <- data.frame("prediction"=lasso.predictions$txpts.snps,"true.values"=true.breeding.values)
+ggplot(f.dat,aes(x=prediction,y=true.values)) + geom_point() + geom_smooth(method="loess") +
+    stat_cor() + theme_pubclean() + geom_vline(xintercept = 117.8573) + geom_hline(yintercept = 117.8573) 
+```
+
+* Fitting LM
+
+```{r}
+f.dat <- data.frame("prediction"=lasso.predictions$txpts.snps,"true.values"=true.breeding.values)
+ggplot(f.dat,aes(x=prediction,y=true.values)) + geom_point() + geom_smooth(method="lm") +
+    stat_cor() + theme_pubclean() + geom_vline(xintercept = 117.8573) + geom_hline(yintercept = 117.8573) 
+```
+
+
+* The intercept is drawn at the population mean for the true breeding values
+
+
+## Residual by family
+
+```{r}
+lasso.predictions <- do.call(rbind,lapply(cv.loo.predictions,function(x) x$lasso))
+plot(lasso.predictions$txpts.snps-true.breeding.values)
+```
+
+
+```{r}
+f.dat <- data.frame("fam.residual"=lasso.predictions$txpts.snps - true.breeding.values,"vol.accuracy"=cv.70.data$fam.phenos$`Volume Accuracy`)
+ggplot(f.dat,aes(x=fam.residual,y=vol.accuracy)) + geom_point() + geom_smooth(method="auto") +
+    stat_cor() + theme_pubclean() 
+```

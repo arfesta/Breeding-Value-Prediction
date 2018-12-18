@@ -12,7 +12,8 @@
     + [Step 3 - Transcript normalization and SNP filtering](#step-3---transcript-normalization-and-snp-filtering)
     + [Step 4 - Prediction of EW families with LGEP](#step-4---prediction-of-ew-families-with-lgep)
     + [Step 5 - Prediction of 70-fold CV](#step-5---prediction-of-70-fold-cv)
-    
+    + [Step 6 - Prediction using LOO](#step-6---prediction-using-loo)
+
 ## Abstract
 
 * Phenotypic variation in forest trees may be partitioned into genomic and environmntal compenets which are consequently used to estimate the heritability of traits as the proportion of total phenotypic variation attributed to genetic variation.
@@ -69,28 +70,40 @@ Data Subject Type | Data File Type | Path | Notes
       
    Additionally, the phenotype and other sample meta-data is constructed for normalization.
    
-   To see this process for **biological reps**, navigate to: [load counts bio rep html file](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step2.loadcounts/load.counts.html) which contains the complete markdown and output.
+   To see this process for **biological reps**, navigate to: 
+   
+   [load counts bio rep html file](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step2.loadcounts/load.counts.html) which contains the complete markdown and output.
 
-   To see this process for **technical reps**, navigate to: [load counts tech rep html file](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step2.loadcounts/load.counts_techreps.html) which contains the complete markdown and output.
+   To see this process for **technical reps**, navigate to: 
+   
+   [load counts tech rep html file](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step2.loadcounts/load.counts_techreps.html) which contains the complete markdown and output.
 
 ### Step 3 - Transcript normalization and SNP filtering
 
 The counts were normarlized *multiple* ways, however only the #1 was used for prediction:
 
-  1.  Using **techincal replicate** counts and asreml to normalize for batch, index, lane, and pedigree: [markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step3.normalization/Step3_LMM_animal.html)
+  1.  Using **techincal replicate** counts and asreml to normalize for batch, index, lane, and pedigree:
+  
+  [markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step3.normalization/Step3_LMM_animal.html)
   
   2.  Using DESEQ2, edgeR, sommer in bio and tech see repo
   
-  3. SNP's were filtered multiple ways: [markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step3.normalization/snp_filtering.html)
+  3. SNP's were filtered multiple ways: 
   
-  4. The final data sets used for prediction were restructured to be in identical order: [markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step1_data_restructure.html)
+  [markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step3.normalization/snp_filtering.html)
+  
+  4. The final data sets used for prediction were restructured to be in identical order: 
+  
+  [markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step1_data_restructure.html)
   
 
 ### Step 4 - Prediction of EW families with LGEP
 
 #### Conduct prediction on EW
 
-   Family mean estimates of counts and snps were used for prediction with OmicKriging and glmnet (lasso/ridge): [EW predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step3_lgep.vs.ew_pred.v2.html)
+   Family mean estimates of counts and snps were used for prediction with OmicKriging and glmnet (lasso/ridge): 
+   
+   [EW predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step3_lgep.vs.ew_pred.v2.html)
 
 
 #### **The below part is defunct, the scripts are still there but are not used. 
@@ -99,11 +112,15 @@ The counts were normarlized *multiple* ways, however only the #1 was used for pr
 
 #### Generate anova scores using LGEP as training
 
-  Utilizing the biological replicate data sets, ANOVA scores were estimated for each feature (snp/transcript): [LGEP_ANOVA](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step2_lgep.vs.ew_anova.html)
+  Utilizing the biological replicate data sets, ANOVA scores were estimated for each feature (snp/transcript): 
+  
+  [LGEP_ANOVA](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step2_lgep.vs.ew_anova.html)
   
 #### Conduct prediction on EW
 
-   Family mean estimates of counts and snps were used for prediction with OmicKriging and glmnet (lasso/ridge): [EW predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step3_lgep.vs.ew_pred.html)
+   Family mean estimates of counts and snps were used for prediction with OmicKriging and glmnet (lasso/ridge): 
+   
+   [EW predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step3_lgep.vs.ew_pred.html)
    
   
 ### Step 5 - Prediction of 70-fold CV
@@ -112,14 +129,28 @@ The counts were normarlized *multiple* ways, however only the #1 was used for pr
 
 #### Construct 70 test groups
 
- Instead of predicting across batch, here we split the complete data set into a 7-fold CV (repeated 10 times).  The cv groups were split so that each test fold had individuals which were spread across the phenotypic range: [create 70 fold](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step4_create_70fold.html)
+ Instead of predicting across batch, here we split the complete data set into a 7-fold CV (repeated 10 times).  The cv groups were split so that each test fold had individuals which were spread across the phenotypic range: 
+ 
+ [create 70 fold](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step4_create_70fold.html)
  
 #### Conduct prediction on each of the test folds
 
-Just as when predicting on the EW families, predictions were carried out for each of the 70 unique test groups: [predict 70-fold](https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step5_cv.70.predictions.Rmd)
+Just as when predicting on the EW families, predictions were carried out for each of the 70 unique test groups: 
+
+[predict 70-fold](https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step5_cv.70.predictions.Rmd)
   
 #### Visualize prediction of 70-fold
 
 [70-fold-cv markdown](https://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step6_visualize_predictions.html)
  
+
+### Step 6 - Prediction using LOO
+
+ Predictions were conducted using a maximum training size of 55 to predict the 56th family using OK, lasso, & ridge. Script: 
+ 
+ [LOO Script](https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step7_loo.predictions.R)
+  
+#### Visualize prediction of LOO
+
+[LOO markdown](https://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step7_visualize_predictions.html)
  
