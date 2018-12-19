@@ -106,7 +106,36 @@ The counts were normarlized *multiple* ways, however only the #1 was used for pr
    [EW predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step3_lgep.vs.ew_pred.v2.html)
 
 
-#### **The below part is defunct, the scripts are still there but are not used. 
+### Step 5 - Prediction of 70-fold CV
+
+#### Construct 70 test groups
+
+ Instead of predicting across batch, here we split the complete data set into a 7-fold CV (repeated 10 times).  The cv groups were split so that each test fold had individuals which were spread across the phenotypic range: 
+ 
+ [create 70 fold](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step4_create_70fold.html)
+
+#### Conduct prediction on each of the test folds using all data
+
+[prediction_script](https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step5_cv.70.predictions.V2.R)
+
+#### Visualize predictions
+
+[70 Fold CV visualization](https://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step6_visualize_predictions.v2.html)
+
+
+### Step 6 - Prediction using LOO
+
+ Predictions were conducted using a maximum training size of 55 to predict the 56th family using OK, lasso, & ridge. Script: 
+ 
+ [LOO Script](https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step7_loo.predictions.R)
+  
+#### Visualize prediction of LOO
+
+[LOO markdown](https://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step7_visualize_predictions.html)
+
+
+## 
+**The below part is defunct, the scripts are still there but are not used. 
 
  Estimate anova scores for features using LGEP and then conduct prediction on EW
 
@@ -123,25 +152,10 @@ The counts were normarlized *multiple* ways, however only the #1 was used for pr
    [EW predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step3_lgep.vs.ew_pred.html)
    
   
-### Step 5 - Prediction of 70-fold CV
 
- First construct the 70 test groups, estimate ANOVA scores, and then conduct predictions
-
-#### Construct 70 test groups
-
- Instead of predicting across batch, here we split the complete data set into a 7-fold CV (repeated 10 times).  The cv groups were split so that each test fold had individuals which were spread across the phenotypic range: 
+ **The below part is defunct, the scripts are still there but are not used.** 
  
- [create 70 fold](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step4_create_70fold.html)
-
-#### Conduct prediction on each of the test folds using all data
-
-[prediction_script](https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step5_cv.70.predictions.V2.R)
-
-#### Visualize predictions
-
-[70 Fold CV visualization](https://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step6_visualize_predictions.v2.html)
-
-#### **The below part is defunct, the scripts are still there but are not used. 
+  First construct the 70 test groups, estimate ANOVA scores, and then conduct predictions
  
  #### Conduct prediction on each of the test folds across pvals
 
@@ -152,15 +166,5 @@ Just as when predicting on the EW families, predictions were carried out for eac
  #### Visualize prediction of 70-fold
 
 [70-fold-cv markdown](https://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step6_visualize_predictions.html)
- 
 
-### Step 6 - Prediction using LOO
-
- Predictions were conducted using a maximum training size of 55 to predict the 56th family using OK, lasso, & ridge. Script: 
- 
- [LOO Script](https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step7_loo.predictions.R)
-  
-#### Visualize prediction of LOO
-
-[LOO markdown](https://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step7_visualize_predictions.html)
  
