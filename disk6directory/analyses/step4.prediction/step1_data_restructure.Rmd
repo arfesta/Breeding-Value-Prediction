@@ -49,15 +49,21 @@ head(rownames(snps))
 
 ```{r load.txpts}
 load("../../../shared/Step3_LMM_animal.RData")
+load("../../../shared/Step2_TECH_Load_Counts.RData")
 ```
 
-* The rownames need to be fixed:
+* The rownames/colnames need to be fixed:
 
 ```{r fix.txpt.names}
+head(colnames(asreml.counts))
+dim(asreml.counts)
+dim(load.counts_tech$txi_object$abundance)
+colnames(asreml.counts) <- rownames(load.counts_tech$txi_object$abundance)
 head(rownames(asreml.counts))
 rownames(asreml.counts) <- gsub(pattern = "ped\\(animal_id, var = T)_",replacement = "",x = rownames(asreml.counts))
 head(rownames(asreml.counts))
 asreml.counts <- asreml.counts[-c(1:94),]
+rm(load.counts_tech)
 ```
 
 * Load all phenos (tech reps)

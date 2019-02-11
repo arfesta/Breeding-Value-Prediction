@@ -98,6 +98,9 @@ img {
 button.code-folding-btn:focus {
   outline: none;
 }
+summary {
+  display: list-item;
+}
 </style>
 
 
@@ -105,14 +108,74 @@ button.code-folding-btn:focus {
 <div class="container-fluid main-container">
 
 <!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
 <script>
 $(document).ready(function () {
   window.buildTabsets("TOC");
 });
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open')
+  });
+});
 </script>
 
 <!-- code folding -->
-
 
 
 
@@ -175,18 +238,27 @@ head(rownames(snps))</code></pre>
 <ul>
 <li>Loads trancript normalization returned from asreml</li>
 </ul>
-<pre class="r"><code>load(&quot;../../../shared/Step3_LMM_animal.RData&quot;)</code></pre>
+<pre class="r"><code>load(&quot;../../../shared/Step3_LMM_animal.RData&quot;)
+load(&quot;../../../shared/Step2_TECH_Load_Counts.RData&quot;)</code></pre>
 <ul>
-<li>The rownames need to be fixed:</li>
+<li>The rownames/colnames need to be fixed:</li>
 </ul>
-<pre class="r"><code>head(rownames(asreml.counts))</code></pre>
+<pre class="r"><code>head(colnames(asreml.counts))</code></pre>
+<pre><code>## [1] &quot;1&quot; &quot;2&quot; &quot;3&quot; &quot;4&quot; &quot;5&quot; &quot;6&quot;</code></pre>
+<pre class="r"><code>dim(asreml.counts)</code></pre>
+<pre><code>## [1]   321 70109</code></pre>
+<pre class="r"><code>dim(load.counts_tech$txi_object$abundance)</code></pre>
+<pre><code>## [1] 70109   681</code></pre>
+<pre class="r"><code>colnames(asreml.counts) &lt;- rownames(load.counts_tech$txi_object$abundance)
+head(rownames(asreml.counts))</code></pre>
 <pre><code>## [1] &quot;ped(animal_id, var = T)_GR011&quot;  &quot;ped(animal_id, var = T)_N05052&quot;
 ## [3] &quot;ped(animal_id, var = T)_N07002&quot; &quot;ped(animal_id, var = T)_N07022&quot;
 ## [5] &quot;ped(animal_id, var = T)_N07029&quot; &quot;ped(animal_id, var = T)_N07051&quot;</code></pre>
 <pre class="r"><code>rownames(asreml.counts) &lt;- gsub(pattern = &quot;ped\\(animal_id, var = T)_&quot;,replacement = &quot;&quot;,x = rownames(asreml.counts))
 head(rownames(asreml.counts))</code></pre>
 <pre><code>## [1] &quot;GR011&quot;  &quot;N05052&quot; &quot;N07002&quot; &quot;N07022&quot; &quot;N07029&quot; &quot;N07051&quot;</code></pre>
-<pre class="r"><code>asreml.counts &lt;- asreml.counts[-c(1:94),]</code></pre>
+<pre class="r"><code>asreml.counts &lt;- asreml.counts[-c(1:94),]
+rm(load.counts_tech)</code></pre>
 <ul>
 <li>Load all phenos (tech reps)</li>
 </ul>

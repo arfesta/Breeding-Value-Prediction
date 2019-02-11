@@ -1,0 +1,66 @@
+---
+title: "LGEP vs. EW Data"
+author: "Adam Festa"
+date: "11/27/2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Purpose
+
+Conduct anova for each SNP/transcript using biological replicates and fdr adjust
+
+## Load data
+
+* Load the object from Step 1 in predictions "ordered.data.RData"
+
+```{r pressure}
+library(caret); library(parallel)
+load("~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/ordered.data.RData")
+names(ordered.data)
+```
+
+## Create training set
+
+* Training set will be all LGEP families, including those from EW which overlapped
+
+```{r anova}
+ordered.data$bio.counts <- scale(log2(ordered.data$bio.counts + 1),center=F)
+rm.ew.rows <- which(as.character(ordered.data$bio.phenos$fam_id) %in% ordered.data$ew.fams)
+train.bio.counts <- ordered.data$bio.counts[-rm.ew.rows,]
+train.bio.snps <- ordered.data$bio.snps[-rm.ew.rows,]
+train.bio.phenos <- ordered.data$bio.phenos[-rm.ew.rows,]
+rm(rm.ew.rows)
+dim(train.bio.counts);dim(train.bio.snps);dim(train.bio.phenos)
+```
+
+## Create test and train for prediction
+
+* Prediction will be done on family-mean values, so create test/train on family mean objects
+
+```{r create.train}
+rm.ew.fams <- which(as.character(ordered.data$fam.phenos$fam_id) %in% ordered.data$ew.fams)
+ordered.data$fam.counts <- scale(log2(ordered.data$fam.counts + 1),center=F)
+train.lgep.counts <- ordered.data$fam.counts[-rm.ew.fams,]
+train.lgep.snps <- ordered.data$fam.snps[-rm.ew.fams,]
+train.lgep.phenos <- ordered.data$fam.phenos[-rm.ew.fams,]
+
+test.ew.counts <- ordered.data$fam.counts[rm.ew.fams,]
+test.ew.snps <- ordered.data$fam.snps[rm.ew.fams,]
+test.ew.phenos <- ordered.data$fam.phenos[rm.ew.fams,]
+```
+
+## Save output for prediction across batch
+
+* Create list of all objects needed for prediction of EW using LGEP
+
+```{r save}
+lgep.vs.ew.data <- list("train.counts"=train.lgep.counts,"train.snps"=train.lgep.snps,"train.phenos"=train.lgep.phenos,"test.counts"=test.ew.counts,"test.snps"=test.ew.snps,"test.phenos"=test.ew.phenos)
+
+save(lgep.vs.ew.data,file="~/Desktop/Alt Approaches/Breeding-Value-Prediction/shared/lgep.vs.ew.data.RData",compress=T)
+```

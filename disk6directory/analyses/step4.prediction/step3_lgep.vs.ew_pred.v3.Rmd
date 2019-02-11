@@ -1,0 +1,168 @@
+---
+title: "LGEP vs. EW Prediction"
+author: "Adam Festa"
+date: "2/4/2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+  
+  ## Purpose
+  
+  The purpose of this script is to conduct predictions with ridge, lasso, and OmicKriging on the EW families using the LGEP families
+ 
+## Load starting data
+ 
+* Load the LGEP vs EW data & R packages
+ 
+```{r load.data}
+library(glmnet); library(doParallel); library(ggplot2)
+library(ggpubr); library(OmicKriging); library(caret)
+load("../../../shared/lgep.vs.ew.data.RData")
+names(lgep.vs.ew.data)
+```
+ 
+* Specify fdr p-values to test and register cores
+ 
+```{r pvals}
+registerDoParallel(cores=detectCores())
+```
+ 
+## Ridge/Lasso/OK
+ 
+* Ridge/Lasso prediction using transcripts or SNPs works as follows:
+
+  1) Training data is used with phenotype data with generic glment function to determine variables which are non-zero
+  
+  2) Variables which are non-zero are then subset from the training data and used with CV.glment function conducting LOO to build model used to predict test set (EW families)
+  
+* OmicKriging prediction was done as follows:
+
+  1) Training data is used with phenotypes to test correlation weights 0.1 to 1.0 by 0.1 to choose a correlation weight to use on test data.  This was done using a LOO for each weight and then choosing the correlation weight which gave the lowest RMSE across all individuals.
+  
+  2) The specified correlation weight was then used with training data to predict ew families
+
+* Predict EW families using txpts with Ridge, Lasso, & OmicKriging
+ 
+```{r ridge.lasso, cache=T}
+ 
+  # First transcripts ridge/lasso
+  pval.train <- lgep.vs.ew.data$train.counts
+  pval.test <- lgep.vs.ew.data$test.counts
+  
+  gl.mod <- glmnet(x = pval.train,y =lgep.vs.ew.data$train.phenos$Volume,alpha = 1,standardize = F)
+  
+  # Extract coefficients from model
+  gl.mod1 <- as.matrix(coef(gl.mod))
+  # For each row (covariate) in matrix determine the unique length of values
+    # The first row corresponds to intercept so it is removed from final vector.
+    # The first column is all 0's so there has to be more than 1 unique value in order for the covariate to be non-zero
+  gl.mod1 <- apply(gl.mod1,1,function(x) length(unique(x)))[-1]
+  these <-  which(gl.mod1 > 1)
+  lasso.cv <- cv.glmnet(x = pval.train[,names(these)],y = lgep.vs.ew.data$train.phenos$Volume,parallel = T,alpha=1,nfolds = 45,grouped = F,standardize=F,type.measure = "mae")
+  
+  txpt.lasso.pred <- predict.cv.glmnet(object = lasso.cv,newx = pval.test[,these],s = lasso.cv$lambda.min)
+  plot(txpt.lasso.pred[,1],lgep.vs.ew.data$test.phenos$Volume)
+  cor(txpt.lasso.pred[,1],lgep.vs.ew.data$test.phenos$Volume)
+    RMSE(txpt.lasso.pred,lgep.vs.ew.data$test.phenos$Volume)
+  txpt.lasso.features <- names(these)
+
+pt <- proc.time()  
+  ridge.cv <- cv.glmnet(x = pval.train,y = lgep.vs.ew.data$train.phenos$Volume,parallel = T,alpha=0,nfolds = 45,grouped = F,standardize=F,type.measure = "mae")
+    print(proc.time()-pt)
+  txpt.ridge.pred <- predict.cv.glmnet(object = ridge.cv,newx = pval.test,s = ridge.cv$lambda.min)
+  plot(txpt.ridge.pred[,1],lgep.vs.ew.data$test.phenos$Volume)
+  cor(txpt.ridge.pred[,1],lgep.vs.ew.data$test.phenos$Volume)
+  RMSE(txpt.ridge.pred,lgep.vs.ew.data$test.phenos$Volume)
+  
+  # transcripts OK
+  x.train <- cor(t(pval.train))
+  y.train <- lgep.vs.ew.data$train.phenos
+  all.weights <- seq(.1,1,.1)
+  
+  train.rmse <- unlist(lapply(1:length(all.weights),function(each.weight){
+    this.w <- all.weights[each.weight]
+    ok.preds <- lapply(1:nrow(y.train),function(each.cv){
+      ok.pred <- okriging(idtest = y.train$fam_id[each.cv],idtrain = y.train$fam_id[-each.cv],corlist = list(x.train),H2vec = c(this.w),pheno = y.train,phenoname = "Volume")
+    })
+    ok.preds <-do.call(rbind,ok.preds)
+    RMSE(ok.preds[,2],ok.preds[,3])
+  }))
+  
+  final.weight <- all.weights[which.min(train.rmse)]
+  all.d <- rbind(pval.train,pval.test)
+  all.p <- rbind(y.train,lgep.vs.ew.data$test.phenos)
+  x.cor <- cor(t(all.d))
+  pt <- proc.time()
+  ok.pred <- okriging(idtest = lgep.vs.ew.data$test.phenos$fam_id,idtrain = lgep.vs.ew.data$train.phenos$fam_id,corlist = list(x.cor),H2vec = c(final.weight),pheno = all.p ,phenoname = "Volume")
+    print(proc.time()-pt)
+  txpt.ok.pred <- ok.pred[,-c(1)]
+  plot(txpt.ok.pred[,1],txpt.ok.pred[,2])
+  cor(txpt.ok.pred[,1],txpt.ok.pred[,2])
+  
+  txpt.predictions <- list("true.phenos"=txpt.ok.pred[,2],"lasso.pred"=txpt.lasso.pred,"ridge.pred"=txpt.ridge.pred,"ok.pred"=txpt.ok.pred,"lasso.feats"=txpt.lasso.features)
+```
+
+
+* Predict EW families using SNPs with Ridge, Lasso, & OmicKriging
+
+```{r snp.pred, cache=T}
+
+  # Next snps ridge/lasso
+  pval.train <- as.matrix(lgep.vs.ew.data$train.snps)
+  pval.test <- as.matrix(lgep.vs.ew.data$test.snps)
+  
+  gl.mod <- glmnet(x = pval.train,y =lgep.vs.ew.data$train.phenos$Volume,alpha = 1,standardize = F)
+  gl.mod1 <- as.matrix(coef.glmnet(gl.mod))
+  gl.mod1 <- apply(gl.mod1,1,function(x) length(unique(x)))[-1]
+  these <-  which(gl.mod1 > 1)
+  lasso.cv <- cv.glmnet(x = pval.train[,names(these)],y = lgep.vs.ew.data$train.phenos$Volume,parallel = T,alpha=1,nfolds = 45,grouped = F,standardize=F,type.measure = "mae")
+  
+  snp.lasso.pred <- predict.cv.glmnet(object = lasso.cv,newx = pval.test[,names(these)],s = lasso.cv$lambda.min)
+  snp.lasso.features <- names(these)
+  plot(snp.lasso.pred,lgep.vs.ew.data$test.phenos$Volume)
+  cor(snp.lasso.pred,lgep.vs.ew.data$test.phenos$Volume)
+  RMSE(snp.lasso.pred,lgep.vs.ew.data$test.phenos$Volume)
+ 
+  pt <- proc.time()
+  ridge.cv <- cv.glmnet(x = pval.train,y = lgep.vs.ew.data$train.phenos$Volume,parallel = T,alpha=0,nfolds = 45,grouped = F,standardize=F,type.measure = "mae")
+  print(proc.time()-pt)
+  snp.ridge.pred <- predict.cv.glmnet(object = ridge.cv,newx = pval.test,s = ridge.cv$lambda.min)
+    plot(snp.ridge.pred,lgep.vs.ew.data$test.phenos$Volume)
+  cor(snp.ridge.pred,lgep.vs.ew.data$test.phenos$Volume)
+  RMSE(snp.ridge.pred,lgep.vs.ew.data$test.phenos$Volume)
+  
+  # snps OK
+  x.train <- cor(t(pval.train))
+  y.train <- lgep.vs.ew.data$train.phenos
+  all.weights <- seq(.1,1,.1)
+  
+  train.rmse <- unlist(lapply(1:length(all.weights),function(each.weight){
+    this.w <- all.weights[each.weight]
+    ok.preds <- lapply(1:nrow(y.train),function(each.cv){
+      ok.pred <- okriging(idtest = y.train$fam_id[each.cv],idtrain = y.train$fam_id[-each.cv],corlist = list(x.train),H2vec = c(this.w),pheno = y.train,phenoname = "Volume")
+    })
+    ok.preds <-do.call(rbind,ok.preds)
+    RMSE(ok.preds[,2],ok.preds[,3])
+  }))
+  
+  final.weight <- all.weights[which.min(train.rmse)]
+  all.d <- rbind(pval.train,pval.test)
+  all.p <- rbind(y.train,lgep.vs.ew.data$test.phenos)
+  x.cor <- cor(t(all.d))
+  pt <- proc.time()
+  ok.pred <- okriging(idtest = lgep.vs.ew.data$test.phenos$fam_id,idtrain = lgep.vs.ew.data$train.phenos$fam_id,corlist = list(x.cor),H2vec = c(final.weight),pheno = all.p ,phenoname = "Volume")
+    print(proc.time()-pt)
+  snp.ok.pred <- ok.pred[,-1]
+  plot(snp.ok.pred[,1],snp.ok.pred[,2])
+  cor(snp.ok.pred[,1],snp.ok.pred[,2])
+  
+  snp.predictions <- list("true.phenos"=snp.ok.pred[,2],"lasso.pred"=snp.lasso.pred,"ridge.pred"=snp.ridge.pred,"ok.pred"=snp.ok.pred,"lasso.feats"=snp.lasso.features)
+```
+ 
+* Save output
+ 
+```{r save}
+ew.lgep.results <- list("snps"=snp.predictions,"txpts"=txpt.predictions)
+save(ew.lgep.results,file = "../../../shared/lgep.vs.ew.ridge.lasso.ok.V3.RData",compress=T)
+```

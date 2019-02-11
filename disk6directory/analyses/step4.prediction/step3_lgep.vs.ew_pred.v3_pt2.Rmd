@@ -1,0 +1,99 @@
+---
+title: "LGEP vs. EW Prediction"
+author: "Adam Festa"
+date: "2/4/2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+  
+## Purpose / load starting data
+  
+The purpose of this script is to conduct predictions with ridge, lasso, and OmicKriging on the EW families using the LGEP families
+ 
+Load the LGEP vs EW data & R packages
+ 
+```{r load.data, message=FALSE, warning=FALSE, include=FALSE}
+suppressPackageStartupMessages(expr = c(library(knitr),library(glmnet,quietly = T),library(ggplot2,quietly = T,verbose = F),
+library(doParallel), library(ggplot2),library(ggpubr), library(OmicKriging), library(caret)))
+load("../../../shared/lgep.vs.ew.ridge.lasso.ok.V3.RData")
+```
+
+## Results
+
+### Table of results
+
+A table of results including the pearson correlation, spearman correlation, and RMSE using transcripts, SNPs, or transcripts + SNPs to predict the EW families
+
+```{r,echo=F}
+lasso.cor = c(cor(ew.lgep.results$snps$true.phenos,ew.lgep.results$snps$lasso.pred),
+cor(ew.lgep.results$snps$true.phenos,ew.lgep.results$txpts$lasso.pred),
+cor(ew.lgep.results$snps$true.phenos,(ew.lgep.results$txpts$lasso.pred+ew.lgep.results$snps$lasso.pred)/2))
+
+ridge.cor = c(cor(ew.lgep.results$snps$true.phenos,ew.lgep.results$snps$ridge.pred),
+cor(ew.lgep.results$snps$true.phenos,ew.lgep.results$txpts$ridge.pred),
+cor(ew.lgep.results$snps$true.phenos,c(ew.lgep.results$txpts$ridge.pred + ew.lgep.results$snps$ridge.pred)/2))
+
+lasso.spear = c(cor(ew.lgep.results$snps$true.phenos,ew.lgep.results$snps$lasso.pred,method="spearman"),
+cor(ew.lgep.results$snps$true.phenos,ew.lgep.results$txpts$lasso.pred,method="spearman"),
+cor(ew.lgep.results$snps$true.phenos,c(ew.lgep.results$txpts$lasso.pred + ew.lgep.results$snps$lasso.pred)/2,method="spearman"))
+
+ridge.spear = c(cor(ew.lgep.results$snps$true.phenos,ew.lgep.results$snps$ridge.pred,method="spearman"),
+cor(ew.lgep.results$snps$true.phenos,ew.lgep.results$txpts$ridge.pred,method="spearman"),
+cor(ew.lgep.results$snps$true.phenos,c(ew.lgep.results$txpts$ridge.pred + ew.lgep.results$snps$ridge.pred)/2,method="spearman"))
+
+lasso.rmse = c(RMSE(ew.lgep.results$snps$true.phenos,ew.lgep.results$snps$lasso.pred),
+RMSE(ew.lgep.results$snps$true.phenos,ew.lgep.results$txpts$lasso.pred),
+RMSE(ew.lgep.results$snps$true.phenos,c(ew.lgep.results$txpts$lasso.pred + ew.lgep.results$snps$lasso.pred)/2))
+
+ridge.rmse = c(RMSE(ew.lgep.results$snps$true.phenos,ew.lgep.results$snps$ridge.pred),
+RMSE(ew.lgep.results$snps$true.phenos,ew.lgep.results$txpts$ridge.pred),
+RMSE(ew.lgep.results$snps$true.phenos,c(ew.lgep.results$txpts$ridge.pred + ew.lgep.results$snps$ridge.pred)/2))
+
+dat.frame <- cbind(lasso.cor,lasso.spear,lasso.rmse,ridge.cor,ridge.spear,ridge.rmse)
+rownames(dat.frame) <- c("snps","txpts","txpts+snps")
+kable(dat.frame)
+```
+
+### Plot top results
+
+```{r}
+pred.dat <- data.frame("prediction"=(ew.lgep.results$snps$lasso.pred + ew.lgep.results$txpts$lasso.pred)/2 ,"truth"=ew.lgep.results$snps$true.phenos)
+ggplot(pred.dat,aes(x=X1,y=truth)) + geom_point() + theme_pubclean() + geom_smooth(method = "lm") + theme_pubclean() + stat_cor() + ylab("True BV") + xlab("Predicted BV")
+```
+
+### Plot transcripts alone
+
+```{r}
+pred.dat <- data.frame("prediction"=ew.lgep.results$txpts$lasso.pred,"truth"=ew.lgep.results$snps$true.phenos)
+ggplot(pred.dat,aes(x=X1,y=truth)) + geom_point() + theme_pubclean() + geom_smooth(method = "lm") + theme_pubclean() + stat_cor() + ylab("True BV") + xlab("Predicted BV")
+```
+
+### Lasso feature variables
+
+Number of variables selected for SNPs and transcripts
+
+```{r}
+length(ew.lgep.results$snps$lasso.feats)
+length(ew.lgep.results$txpts$lasso.feats)
+```
+
+* There are 59 SNPs and 60 transcripts which were used for prediction
+
+Remove SNP position from name to get transcript name that snp was found
+
+```{r}
+# First remove the position of snps within transcripts from SNP lasso features
+snp.features.no.pos <- sub("_[^_]+$", "", ew.lgep.results$snps$lasso.feats)
+length(unique(snp.features.no.pos))
+#table(snp.features.no.pos)
+```
+ 
+* There are 58 unique transcripts in which a SNP was found, the transcript which had two snps in it was est_Pita_34350202
+
+Check for any transcripts which were selected using both transcripts & SNPs
+```{r}
+which(ew.lgep.results$txpts$lasso.feats %in% unique(snp.features.no.pos))
+```
+
+No transcripts were selected in both snps & transcripts
