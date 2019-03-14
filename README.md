@@ -24,69 +24,17 @@
 
 ## Background of samples
 
-* LGEP
-   
-   - 144 Biological Replicates x 3 technical replicates = 432 technical replicates
+* All information about samples is located in the RNA Seq Data repo
 
-* EW
+### Step 1 - Transcript normalization and SNP filtering
 
-   - 80 Biological Replicates x 3 technical replicates = 240 technical replicates
-
-## Location of data
-
-Data Subject Type | Data File Type | Path | Notes
---- | --- | --- | ---
-**raw read files**  | | `/media/disk6/ARF/RNASEQ/shared/rawreads/86kSalmon` | Raw files returned from GSL
-| | *raw tar* | `./EWtarfiles or ./LGEPtarfiles`
-| | *raw fasta* | `./EWfasta or ./LGEPfasta` 
-**trimmed and filtered read files** | |`/media/disk6/ARF/RNASEQ/shared/trimmedfiltreads/86k` | Files post trim & adapater removal
-|  |*EW* | `./EW/lane01 ... ./lane12` | 
-|  |*LGEP* | `./LGEP/lane01 ... ./lane18` | 
-**salmon count files** | |`/media/disk6/ARF/RNASEQ/shared/counts/86kSalmon` | Direcotries containing quant.sf files
-|  |*EW tech reps* | `./EW/lane01 ... ./lane12` | 
-|  |*LGEP tech reps* | `./LGEP/lane01 ... ./lane18` |
-|  |*EW bio reps* | `./bio_EW/Sample_<animal_id>/` | 
-|  |*LGEP bio reps* | `./bio_LGEP/Sample_<animal_id>/` | 
-**experimental data resources**  | | `/media/disk6/ARF/RNASEQ/BV-Prediction/Breeding-Value-Prediction/disk6directory/resources` | Experiment information
-|  |*sequencing* | `./exptdesign/sequencing` | `./EWtarfiles or ./LGEPtarfiles`
-|  |*pedigree* | `./pedigree` | `./EWfasta or ./LGEPfasta`
-|  |*phenotypes* | `./phenos` | `./EWfasta or ./LGEPfasta`
-
-
-## Analyses
-
-### Step 1 - Data Prep
-
-   Data prep includes everything from unpacking the original tar files recieved by the GSL up to estimating transcript               
-      abundance with Salmon. Additionally, this step includes identification of the indicies used within both batches and creates an experimental info matrix containing all meta data from both batches.
-      
-   See the [raw reads README](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/rawreads/012718raw_data_processing.html) for step by step processing of files.  
-   
-  Extra prep scripts: [sample index identification](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step1.data_prep/identify_index_used.ouput.html) & [creation of experimental data](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step1.data_prep/create_expt_data.html)
-
-### Step 2 - Load Count Data
-      
-   Once counts have been estimated, the next step involves reading in the aligned technical, or biological, replicate counts using the tximport package.
-      
-   Additionally, the phenotype and other sample meta-data is constructed for normalization.
-   
-   To see this process for **biological reps**, navigate to: 
-   
-   [load counts bio rep html file](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step2.loadcounts/load.counts.html) which contains the complete markdown and output.
-
-   To see this process for **technical reps**, navigate to: 
-   
-   [load counts tech rep html file](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step2.loadcounts/load.counts_techreps.html) which contains the complete markdown and output.
-
-### Step 3 - Transcript normalization and SNP filtering
-
-The counts were normarlized *multiple* ways, however only the #1 was used for prediction:
+The counts were normarlized *multiple* ways, however the following way was used for prediction:
 
   1.  Using **techincal replicate** counts and asreml to normalize for batch, index, lane, and pedigree:
   
   [markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step3.normalization/Step3_LMM_animal.html)
   
-  2.  Using DESEQ2, edgeR, sommer in bio and tech see repo
+  2.  For more normalization schemes using DESEQ2, edgeR, sommer in bio and tech see repo folder step3.normalization
   
   3. SNP's were filtered multiple ways: 
   
@@ -97,13 +45,21 @@ The counts were normarlized *multiple* ways, however only the #1 was used for pr
   [markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step1_data_restructure.html)
   
 
-### Step 4 - Prediction of EW families with LGEP
+### Step 2 - Prediction of EW families with LGEP
+
+* The EW vs. LGEP
+
+#### Organizing test and train data sets
+
+* EW and LGEP families were subset into train and test objects
+
+  [markdown](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step2_lgep.vs.ew_data.html)
 
 #### Conduct prediction on EW
 
    Family mean estimates of counts and snps were used for prediction with OmicKriging and glmnet (lasso/ridge): 
    
-   [EW predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step3_lgep.vs.ew_pred.v2.html)
+   [EW predictions](http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step3_lgep.vs.ew_pred.v3.html)
 
 
 ### Step 5 - Prediction of 70-fold CV

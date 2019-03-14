@@ -96,6 +96,9 @@ img {
 button.code-folding-btn:focus {
   outline: none;
 }
+summary {
+  display: list-item;
+}
 </style>
 
 
@@ -103,14 +106,74 @@ button.code-folding-btn:focus {
 <div class="container-fluid main-container">
 
 <!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
 <script>
 $(document).ready(function () {
   window.buildTabsets("TOC");
 });
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open')
+  });
+});
 </script>
 
 <!-- code folding -->
-
 
 
 
@@ -153,148 +216,17 @@ $(document).ready(function () {
 <div id="background-of-samples" class="section level2">
 <h2>Background of samples</h2>
 <ul>
-<li><p>LGEP</p></li>
-<li><p>144 Biological Replicates x 3 technical replicates = 432 technical replicates</p></li>
-<li><p>EW</p></li>
-<li><p>80 Biological Replicates x 3 technical replicates = 240 technical replicates</p></li>
+<li>All information about samples is located in the RNA Seq Data repo</li>
 </ul>
-</div>
-<div id="location-of-data" class="section level2">
-<h2>Location of data</h2>
-<table style="width:22%;">
-<colgroup>
-<col width="5%"></col>
-<col width="5%"></col>
-<col width="5%"></col>
-<col width="5%"></col>
-</colgroup>
-<thead>
-<tr class="header">
-<th>Data Subject Type</th>
-<th>Data File Type</th>
-<th>Path</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><strong>raw read files</strong></td>
-<td></td>
-<td><code>/media/disk6/ARF/RNASEQ/shared/rawreads/86kSalmon</code></td>
-<td>Raw files returned from GSL</td>
-</tr>
-<tr class="even">
-<td></td>
-<td><em>raw tar</em></td>
-<td><code>./EWtarfiles or ./LGEPtarfiles</code></td>
-</tr>
-<tr class="odd">
-<td></td>
-<td><em>raw fasta</em></td>
-<td><code>./EWfasta or ./LGEPfasta</code></td>
-</tr>
-<tr class="even">
-<td><strong>trimmed and filtered read files</strong></td>
-<td></td>
-<td><code>/media/disk6/ARF/RNASEQ/shared/trimmedfiltreads/86k</code></td>
-<td>Files post trim &amp; adapater removal</td>
-</tr>
-<tr class="odd">
-<td></td>
-<td><em>EW</em></td>
-<td><code>./EW/lane01 ... ./lane12</code></td>
-<td></td>
-</tr>
-<tr class="even">
-<td></td>
-<td><em>LGEP</em></td>
-<td><code>./LGEP/lane01 ... ./lane18</code></td>
-<td></td>
-</tr>
-<tr class="odd">
-<td><strong>salmon count files</strong></td>
-<td></td>
-<td><code>/media/disk6/ARF/RNASEQ/shared/counts/86kSalmon</code></td>
-<td>Direcotries containing quant.sf files</td>
-</tr>
-<tr class="even">
-<td></td>
-<td><em>EW tech reps</em></td>
-<td><code>./EW/lane01 ... ./lane12</code></td>
-<td></td>
-</tr>
-<tr class="odd">
-<td></td>
-<td><em>LGEP tech reps</em></td>
-<td><code>./LGEP/lane01 ... ./lane18</code></td>
-<td></td>
-</tr>
-<tr class="even">
-<td></td>
-<td><em>EW bio reps</em></td>
-<td><code>./bio_EW/Sample_&lt;animal_id&gt;/</code></td>
-<td></td>
-</tr>
-<tr class="odd">
-<td></td>
-<td><em>LGEP bio reps</em></td>
-<td><code>./bio_LGEP/Sample_&lt;animal_id&gt;/</code></td>
-<td></td>
-</tr>
-<tr class="even">
-<td><strong>experimental data resources</strong></td>
-<td></td>
-<td><code>/media/disk6/ARF/RNASEQ/BV-Prediction/Breeding-Value-Prediction/disk6directory/resources</code></td>
-<td>Experiment information</td>
-</tr>
-<tr class="odd">
-<td></td>
-<td><em>sequencing</em></td>
-<td><code>./exptdesign/sequencing</code></td>
-<td><code>./EWtarfiles or ./LGEPtarfiles</code></td>
-</tr>
-<tr class="even">
-<td></td>
-<td><em>pedigree</em></td>
-<td><code>./pedigree</code></td>
-<td><code>./EWfasta or ./LGEPfasta</code></td>
-</tr>
-<tr class="odd">
-<td></td>
-<td><em>phenotypes</em></td>
-<td><code>./phenos</code></td>
-<td><code>./EWfasta or ./LGEPfasta</code></td>
-</tr>
-</tbody>
-</table>
-</div>
-<div id="analyses" class="section level2">
-<h2>Analyses</h2>
-<div id="step-1---data-prep" class="section level3">
-<h3>Step 1 - Data Prep</h3>
-<p>Data prep includes everything from unpacking the original tar files recieved by the GSL up to estimating transcript<br />
-abundance with Salmon. Additionally, this step includes identification of the indicies used within both batches and creates an experimental info matrix containing all meta data from both batches.</p>
-<p>See the <a href="http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/rawreads/012718raw_data_processing.html">raw reads README</a> for step by step processing of files.</p>
-<p>Extra prep scripts: <a href="http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step1.data_prep/identify_index_used.ouput.html">sample index identification</a> &amp; <a href="http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step1.data_prep/create_expt_data.html">creation of experimental data</a></p>
-</div>
-<div id="step-2---load-count-data" class="section level3">
-<h3>Step 2 - Load Count Data</h3>
-<p>Once counts have been estimated, the next step involves reading in the aligned technical, or biological, replicate counts using the tximport package.</p>
-<p>Additionally, the phenotype and other sample meta-data is constructed for normalization.</p>
-<p>To see this process for <strong>biological reps</strong>, navigate to:</p>
-<p><a href="http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step2.loadcounts/load.counts.html">load counts bio rep html file</a> which contains the complete markdown and output.</p>
-<p>To see this process for <strong>technical reps</strong>, navigate to:</p>
-<p><a href="http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step2.loadcounts/load.counts_techreps.html">load counts tech rep html file</a> which contains the complete markdown and output.</p>
-</div>
-<div id="step-3---transcript-normalization-and-snp-filtering" class="section level3">
-<h3>Step 3 - Transcript normalization and SNP filtering</h3>
-<p>The counts were normarlized <em>multiple</em> ways, however only the #1 was used for prediction:</p>
+<div id="step-1---transcript-normalization-and-snp-filtering" class="section level3">
+<h3>Step 1 - Transcript normalization and SNP filtering</h3>
+<p>The counts were normarlized <em>multiple</em> ways, however the following way was used for prediction:</p>
 <ol style="list-style-type: decimal">
 <li>Using <strong>techincal replicate</strong> counts and asreml to normalize for batch, index, lane, and pedigree:</li>
 </ol>
 <p><a href="http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step3.normalization/Step3_LMM_animal.html">markdown</a></p>
 <ol start="2" style="list-style-type: decimal">
-<li><p>Using DESEQ2, edgeR, sommer in bio and tech see repo</p></li>
+<li><p>For more normalization schemes using DESEQ2, edgeR, sommer in bio and tech see repo folder step3.normalization</p></li>
 <li><p>SNP’s were filtered multiple ways:</p></li>
 </ol>
 <p><a href="http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step3.normalization/snp_filtering.html">markdown</a></p>
@@ -303,12 +235,22 @@ abundance with Salmon. Additionally, this step includes identification of the in
 </ol>
 <p><a href="http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step1_data_restructure.html">markdown</a></p>
 </div>
-<div id="step-4---prediction-of-ew-families-with-lgep" class="section level3">
-<h3>Step 4 - Prediction of EW families with LGEP</h3>
+<div id="step-2---prediction-of-ew-families-with-lgep" class="section level3">
+<h3>Step 2 - Prediction of EW families with LGEP</h3>
+<ul>
+<li>The EW vs. LGEP</li>
+</ul>
+<div id="organizing-test-and-train-data-sets" class="section level4">
+<h4>Organizing test and train data sets</h4>
+<ul>
+<li>EW and LGEP families were subset into train and test objects</li>
+</ul>
+<p><a href="http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step2_lgep.vs.ew_data.html">markdown</a></p>
+</div>
 <div id="conduct-prediction-on-ew" class="section level4">
 <h4>Conduct prediction on EW</h4>
 <p>Family mean estimates of counts and snps were used for prediction with OmicKriging and glmnet (lasso/ridge):</p>
-<p><a href="http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step3_lgep.vs.ew_pred.v2.html">EW predictions</a></p>
+<p><a href="http://htmlpreview.github.com/?https://github.com/arfesta/Breeding-Value-Prediction/blob/master/disk6directory/analyses/step4.prediction/step3_lgep.vs.ew_pred.v3.html">EW predictions</a></p>
 </div>
 </div>
 <div id="step-5---prediction-of-70-fold-cv" class="section level3">
